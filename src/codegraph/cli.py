@@ -716,6 +716,113 @@ def api_drift_alias(
     api_drift_cmd(path=path, repository=repository, json_output=json_output)
 
 
+@app.command("dead-code")
+def dead_code_cmd(
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    max_symbols: Annotated[int, typer.Option("--max-symbols", "-m", help="Max dead symbols to display")] = 50,
+    json_output: Annotated[bool, typer.Option("--json", help="Output raw JSON")] = False,
+) -> None:
+    """Detect zero-caller functions/classes, uncalled zombie HTTP routes, and orphaned database tables."""
+    from codegraph.dead_code import analyze_dead_code
+
+    repo = _resolve_repo(path, repository)
+    if not _ensure_indexed(repo):
+        return
+
+    with _indexer(repo).session() as con:
+        report = analyze_dead_code(con, repo, max_symbols=max_symbols)
+
+    if json_output:
+        typer.echo(json.dumps(report.as_dict(), indent=2))
+        return
+
+    typer.echo(f"CodeGraph Dead Code & Zombie Route Report for {repo.name}:")
+    typer.echo(f"  Runtime Telemetry: {'PRESENT' if report.runtime_traces_present else 'ABSENT (Routes marked UNOBSERVED_AT_RUNTIME)'}")
+    typer.echo(f"  Total Flagged:     {report.total_dead_count}")
+    typer.echo(f"    Dead Symbols:    {len(report.dead_symbols)}")
+    typer.echo(f"    Zombie Routes:   {len(report.zombie_routes)}")
+    typer.echo(f"    Orphaned Tables: {len(report.orphaned_tables)}\n")
+
+    if report.dead_symbols:
+        typer.echo("Dead Symbols (0 Static Callers, 0 Runtime Invocations):")
+        for s in report.dead_symbols:
+            typer.echo(f"  - [{s.kind}] {s.name} ({s.file_path}:{s.line}) [{s.confidence}]")
+        typer.echo()
+
+    if report.zombie_routes:
+        typer.echo("Zombie & Unobserved HTTP Routes:")
+        for r in report.zombie_routes:
+            typer.echo(f"  - [{r.http_method}] {r.route_path} -> {r.handler_name} ({r.file_path}:{r.line}) [{r.status}]")
+        typer.echo()
+
+    if report.orphaned_tables:
+        typer.echo("Orphaned Database Tables (0 Readers, 0 Writers):")
+        for t in report.orphaned_tables:
+            typer.echo(f"  - {t.table_name} ({t.file_path}:{t.line}) [{t.confidence}]")
+
+
+@app.command("otel-listen")
+def otel_listen_cmd(
+    port: Annotated[int, typer.Option("--port", "-p", help="Listening port for OTLP HTTP receiver (default: 4318)")] = 4318,
+    host: Annotated[str, typer.Option("--host", "-h", help="Listening host (default: 127.0.0.1)")] = "127.0.0.1",
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+) -> None:
+    """Run lightweight embedded OpenTelemetry (OTLP/HTTP) trace receiver streaming into .codegraph.sqlite3."""
+    import asyncio
+
+    from codegraph.runtime.otel_receiver import run_otel_listener
+
+    repo = _resolve_repo(path, repository)
+    if not _ensure_indexed(repo):
+        return
+
+    indexer = _indexer(repo)
+
+    def on_batch(result: dict[str, Any]) -> None:
+        events = result.get("ingested_events", 0)
+        edges = result.get("edges_created", 0)
+        typer.echo(f"[OTLP] Ingested trace batch: {events} spans -> {edges} runtime graph edges")
+
+    async def main() -> None:
+        receiver = await run_otel_listener(
+            db_path=indexer.db_path,
+            host=host,
+            port=port,
+            on_batch=on_batch,
+        )
+        typer.echo(f"CodeGraph OTLP HTTP Receiver listening on http://{host}:{port}/v1/traces")
+        typer.echo(f"Export traces using: export OTEL_EXPORTER_OTLP_ENDPOINT=http://{host}:{port}")
+        typer.echo("Press Ctrl+C to terminate.")
+        try:
+            while True:
+                await asyncio.sleep(1)
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            await receiver.stop()
+            typer.echo("\nOTLP Receiver stopped.")
+
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass
+
+
+@app.command("lsp")
+def lsp_cmd(
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+) -> None:
+    """Run Language Server Protocol (LSP) server over stdio for IDE integration (VS Code, Neovim, Helix)."""
+    from codegraph.lsp import run_stdio_lsp_server
+
+    repo = _resolve_repo(path, repository)
+    if not _ensure_indexed(repo):
+        return
+
+    run_stdio_lsp_server(repo)
+
+
 @app.command()
 def imports(
     path: Annotated[str | None, typer.Argument(help="Repository-relative file path to inspect imports for (default: inspect all imports)")] = None,
@@ -1895,6 +2002,67 @@ def refactor_rename_cli_cmd(
             for p, diff in result.diffs.items():
                 cli_echo(f"--- {p} ---")
                 cli_echo(diff)
+        if result.errors:
+            cli_echo("\nErrors:")
+            for err in result.errors:
+                cli_echo(f"  ! {err}")
+
+
+@refactor_app.command("patch")
+def refactor_patch_cli_cmd(
+    patch_file: Annotated[Path, typer.Argument(help="Path to JSON file containing patch specifications (or '-' for stdin)")],
+    path: Annotated[Path | None, typer.Option("--path", "-p", help="Repository path")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    dry_run: Annotated[bool, typer.Option("--dry-run", "-d", help="Preview patch without modifying disk")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Atomically apply or preview a multi-file semantic patch with pre-flight syntax validation and rollback support."""
+    import sys
+
+    from codegraph.refactor.models import RefactorStatus
+    from codegraph.refactor.patcher import apply_semantic_patch, preview_semantic_patch
+
+    repo = _resolve_repo(path, repository)
+
+    if str(patch_file) == "-":
+        raw_text = sys.stdin.read()
+    else:
+        if not patch_file.exists():
+            cli_echo(f"Error: Patch file '{patch_file}' not found.", err=True)
+            raise typer.Exit(1)
+        raw_text = patch_file.read_text(encoding="utf-8")
+
+    try:
+        data = json.loads(raw_text)
+        patch_specs = data if isinstance(data, list) else data.get("patches", [data])
+    except Exception as e:
+        cli_echo(f"Error: Invalid JSON in patch file: {e}", err=True)
+        raise typer.Exit(1) from e
+
+    if dry_run:
+        result = preview_semantic_patch(repo, patch_specs)
+    else:
+        result = apply_semantic_patch(repo, patch_specs, dry_run=False)
+        if result.status == RefactorStatus.APPLIED:
+            try:
+                indexer = _indexer(repo)
+                indexer.index()
+            except Exception:
+                pass
+
+    if json_output:
+        cli_echo(json.dumps(result.to_dict(), indent=2), json_mode=True)
+    else:
+        mode_label = "DRY-RUN PREVIEW" if dry_run else "COMMIT"
+        cli_echo(f"Semantic Patch ({mode_label}): {result.status}")
+        cli_echo(f"Files Changed: {result.files_changed}")
+        if result.rollback_id:
+            cli_echo(f"Rollback ID:   {result.rollback_id}")
+        if result.diffs:
+            cli_echo("\nDiffs:")
+            for p, d in result.diffs.items():
+                cli_echo(f"--- {p} ---")
+                cli_echo(d)
         if result.errors:
             cli_echo("\nErrors:")
             for err in result.errors:

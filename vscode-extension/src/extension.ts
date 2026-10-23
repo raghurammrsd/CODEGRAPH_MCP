@@ -34,11 +34,13 @@ export function activate(context: vscode.ExtensionContext) {
   const routeProvider = new RouteTreeProvider(serverPort);
   const dbProvider = new DatabaseTreeProvider(serverPort);
   const impactProvider = new ImpactTreeProvider();
+  const codeLensProvider = new CodeGraphCodeLensProvider(serverPort);
 
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('codegraph.routeExplorer', routeProvider),
     vscode.window.registerTreeDataProvider('codegraph.dbExplorer', dbProvider),
-    vscode.window.registerTreeDataProvider('codegraph.impactExplorer', impactProvider)
+    vscode.window.registerTreeDataProvider('codegraph.impactExplorer', impactProvider),
+    vscode.languages.registerCodeLensProvider({ scheme: 'file' }, codeLensProvider)
   );
 
   // Commands
@@ -271,6 +273,38 @@ class ImpactTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     items.push(testsGroup);
 
     return items;
+  }
+}
+
+class CodeGraphCodeLensProvider implements vscode.CodeLensProvider {
+  constructor(private port: number) {}
+
+  provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
+    const lenses: vscode.CodeLens[] = [];
+    const text = document.getText();
+    const lines = text.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      // Match function or method definitions
+      if (/^(def\s+[a-zA-Z0-9_]+|function\s+[a-zA-Z0-9_:]+|(export\s+)?(async\s+)?function\s+[a-zA-Z0-9_]+|class\s+[a-zA-Z0-9_]+)/.test(line)) {
+        const range = new vscode.Range(i, 0, i, 0);
+        lenses.push(new vscode.CodeLens(range, {
+          title: `▲ CodeGraph: Blast Radius & Callers`,
+          command: 'codegraph.showImpact',
+        }));
+      }
+
+      // Match Roblox FireServer / InvokeServer calls
+      if (line.includes(':FireServer(') || line.includes(':InvokeServer(')) {
+        const range = new vscode.Range(i, 0, i, 0);
+        lenses.push(new vscode.CodeLens(range, {
+          title: `⚡ Roblox Remote Network Dispatch`,
+          command: 'codegraph.openUI',
+        }));
+      }
+    }
+    return lenses;
   }
 }
 

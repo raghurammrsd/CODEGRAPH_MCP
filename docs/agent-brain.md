@@ -1337,7 +1337,7 @@ CodeGraph supports six deterministic tool profiles (`codegraph mcp serve --profi
 | `graph` | `17` | Tracing, change-impact, test discovery, and architecture sessions | `analyze_impact`, `find_related_tests`, `get_architecture`, `get_call_graph`, `get_callees`, `get_callers`, `get_context`, `get_dependents`, `get_file`, `get_git_impact`, `get_imports`, `get_references`, `get_symbol`, `list_routes`, `resolve_symbol`, `search_symbols`, `trace_path` |
 | `minimal` | `21` | Context-heavy coding sessions needing core interrogation plus get_context and read_file | `compile_task`, `find_symbol`, `get_architecture`, `get_callees`, `get_callers`, `get_context`, `get_dependents`, `get_file`, `get_git_impact`, `get_imports`, `get_references`, `get_repository_status`, `get_resource_status`, `get_symbol`, `list_routes`, `read_file`, `resolve_symbol`, `search_code`, `search_symbols`, `trace_path`, `verify_evidence` |
 | `developer` | `34` | Full interactive development with impact analysis, test linking, and git history | `analyze_change_impact`, `analyze_impact`, `compile_task`, `find_callees`, `find_callers`, `find_references`, `find_related_tests`, `find_symbol`, `get_architecture`, `get_call_graph`, `get_callees`, `get_callers`, `get_context`, `get_dependents`, `get_evidence`, `get_file`, `get_file_history`, `get_git_impact`, `get_graph`, `get_imports`, `get_recent_changes`, `get_references`, `get_repository_status`, `get_resource_status`, `get_symbol`, `list_routes`, `plan_retrieval`, `read_file`, `resolve_symbol`, `search_code`, `search_symbols`, `trace_call`, `trace_path`, `verify_evidence` |
-| `full` | `70` | Complete diagnostic, database intelligence, runtime reconciliation, benchmark, and repository administration sessions | `analyze_change_impact`, `analyze_impact`, `check_api_drift`, `check_context_freshness`, `check_db_drift`, `check_route_schema_drift`, `compare_git`, `compile_task`, `detect_semantic_conflicts`, `find_callees`, `find_callers`, `find_db_callers`, `find_db_columns`, `find_db_models`, `find_db_queries`, `find_db_readers`, `find_db_relationships`, `find_db_tables`, `find_db_writers`, `find_references`, `find_related_tests`, `find_routes`, `find_symbol`, `find_tests`, `get_architecture`, `get_call_graph`, `get_callees`, `get_callers`, `get_change_impact`, `get_context`, `get_db_impact`, `get_db_schema`, `get_db_table`, `get_dependencies`, `get_dependency_graph`, `get_dependents`, `get_distributed_trace`, `get_evidence`, `get_file`, `get_file_history`, `get_file_symbols`, `get_git_impact`, `get_git_state`, `get_graph`, `get_imports`, `get_live_services`, `get_monorepo_packages`, `get_project_structure`, `get_recent_changes`, `get_references`, `get_repository_status`, `get_resource_status`, `get_runtime_trace`, `get_symbol`, `ingest_runtime_traces`, `list_routes`, `plan_retrieval`, `read_file`, `reconcile_static_runtime`, `resolve_symbol`, `rollback_refactor`, `safe_rename`, `search_code`, `search_memory`, `search_symbols`, `trace_call`, `trace_flow`, `trace_path`, `trace_symbol_history`, `verify_evidence` |
+| `full` | `76` | Complete diagnostic, database intelligence, runtime reconciliation, benchmark, and repository administration sessions | `analyze_change_impact`, `analyze_impact`, `apply_semantic_patch`, `batch_find_callers`, `batch_get_context`, `batch_get_symbols`, `check_api_drift`, `check_context_freshness`, `check_db_drift`, `check_route_schema_drift`, `compare_git`, `compile_task`, `detect_semantic_conflicts`, `find_callees`, `find_callers`, `find_db_callers`, `find_db_columns`, `find_db_models`, `find_db_queries`, `find_db_readers`, `find_db_relationships`, `find_db_tables`, `find_db_writers`, `find_dead_code`, `find_references`, `find_related_tests`, `find_routes`, `find_symbol`, `find_tests`, `get_architecture`, `get_call_graph`, `get_callees`, `get_callers`, `get_change_impact`, `get_context`, `get_db_impact`, `get_db_schema`, `get_db_table`, `get_dependencies`, `get_dependency_graph`, `get_dependents`, `get_distributed_trace`, `get_evidence`, `get_file`, `get_file_history`, `get_file_symbols`, `get_git_impact`, `get_git_state`, `get_graph`, `get_imports`, `get_live_services`, `get_monorepo_packages`, `get_project_structure`, `get_recent_changes`, `get_references`, `get_repository_status`, `get_resource_status`, `get_runtime_trace`, `get_symbol`, `ingest_runtime_traces`, `list_routes`, `plan_retrieval`, `preview_semantic_patch`, `read_file`, `reconcile_static_runtime`, `resolve_symbol`, `rollback_refactor`, `safe_rename`, `search_code`, `search_memory`, `search_symbols`, `trace_call`, `trace_flow`, `trace_path`, `trace_symbol_history`, `verify_evidence` |
 
 ---
 
@@ -1730,7 +1730,7 @@ Every tool chain has an explicit **STOP condition**:
 
 ---
 
-## 41. Complete Tool Reference (All 70 Exposed MCP Tools)
+## 41. Complete Tool Reference (All 76 Exposed MCP Tools)
 
 ### `analyze_change_impact`
 
@@ -1837,6 +1837,222 @@ find_related_tests or read_file on direct_callers
 - **Developer request**: "What breaks if we change DatabasePool.acquire?"
 - **Call**: `analyze_impact(symbol="DatabasePool.acquire", max_depth=3)`
 - **Interpretation**: Review direct_callers, transitive_callers, affected_routes, and related_tests.
+
+### `apply_semantic_patch`
+
+- **Capability**: `semantic_patch_apply`
+- **Profiles**: `full`
+- **Task Categories**: `LOCAL_EDIT`, `CHANGE_IMPACT`
+
+#### Purpose
+Atomically apply a multi-file semantic patch across repository files with pre-flight syntax validation and rollback support. Use when executing validated multi-file code modifications with transactional safety and rollback guarantees. Does not prove semantic preservation beyond syntax validation and hash preconditions.
+
+#### Use when
+- Executing multi-file code modifications atomically with rollback safety
+- Ensuring syntax errors never corrupt source files on disk
+
+#### Avoid when
+- Only previewing changes without touching disk (use preview_semantic_patch or dry_run=True)
+
+#### Required inputs
+`patches`
+
+#### Optional inputs
+`dry_run`
+
+#### Minimal invocation
+```python
+apply_semantic_patch(patches=[{"path": "src/main.py", "hunks": [{"target": "foo", "replacement": "bar"}]}])
+```
+
+#### Advanced invocation
+```python
+apply_semantic_patch(patches=[{"path": "src/main.py", "hunks": [{"target": "foo", "replacement": "bar"}]}], dry_run=False)
+```
+
+#### Result interpretation
+- **Output Type**: `RefactorResult`
+- **Key Fields**: `status`, `files_changed`, `rollback_id`, `diffs`, `errors`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Precondition hash verification, AST syntax validation, atomic file replacement via os.replace under RefactorLock, and persistent rollback manifest.
+
+#### Non-guarantees
+Does not prove business logic correctness beyond syntax tree validity.
+
+#### Typical follow-up
+rollback_refactor if rollback needed, or find_tests to verify test suite
+
+#### Common mistakes
+- Passing invalid syntax or target hunks that do not match current disk files
+
+#### Example
+- **Developer request**: "Apply this multi-file patch to app.py and config.json atomically."
+- **Call**: `apply_semantic_patch(patches=[{"path": "app.py", "hunks": [{"target": "a", "replacement": "b"}]}])`
+- **Interpretation**: Verify status=='APPLIED' and save rollback_id for potential rollback.
+
+### `batch_find_callers`
+
+- **Capability**: `batch_caller_discovery`
+- **Profiles**: `full`
+- **Task Categories**: `RELATIONSHIP`, `TRACE`
+
+#### Purpose
+Find functions and methods calling each of the specified symbols in a single round-trip. Use when querying callers of multiple symbols to reduce round trips and multi-turn latency. Does not prove runtime execution of conditional branches.
+
+#### Use when
+- Tracing caller hierarchies across multiple related functions or methods in one call
+- Assessing blast radius of multiple symbols simultaneously
+
+#### Avoid when
+- Only querying callers for a single symbol (use find_callers or get_callers)
+
+#### Required inputs
+`symbols`
+
+#### Optional inputs
+`max_results_per_symbol`
+
+#### Minimal invocation
+```python
+batch_find_callers(symbols=["AuthService.login", "TokenValidator.verify"])
+```
+
+#### Advanced invocation
+```python
+batch_find_callers(symbols=["AuthService.login", "TokenValidator.verify"], max_results_per_symbol=15)
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `results`, `count`, `total_callers`
+- **Relationships Emitted**: `CALLS`
+
+#### Evidence meaning
+Verified CALLS relationships with confidence and AST_VERIFIED evidence.
+
+#### Non-guarantees
+Does not prove runtime execution of conditional branches.
+
+#### Typical follow-up
+get_file on specific caller locations
+
+#### Common mistakes
+- Expecting callee discovery instead of caller discovery (use find_callees)
+
+#### Example
+- **Developer request**: "Who calls AuthService.login and TokenValidator.verify?"
+- **Call**: `batch_find_callers(symbols=["AuthService.login", "TokenValidator.verify"])`
+- **Interpretation**: Inspect results mapping to see callers for each requested symbol.
+
+### `batch_get_context`
+
+- **Capability**: `batch_context_optimization`
+- **Profiles**: `full`
+- **Task Categories**: `MULTI_FILE_INVESTIGATION`, `DEBUG`
+
+#### Purpose
+Compile token-bounded, coverage-optimized ContextPackets for multiple task prompts or symbol targets in a single call. Use when retrieving separate focused contexts for different sub-tasks concurrently. Does not execute repository code or tests.
+
+#### Use when
+- Gathering context for multiple sub-goals in parallel
+- Synthesizing separate context packets for independent components
+
+#### Avoid when
+- Only querying for a single task context (use get_context)
+
+#### Required inputs
+`tasks`
+
+#### Optional inputs
+`max_tokens_per_task`
+
+#### Minimal invocation
+```python
+batch_get_context(tasks=[{"query": "AuthService"}, {"query": "OrderService"}])
+```
+
+#### Advanced invocation
+```python
+batch_get_context(tasks=[{"query": "AuthService", "intent": "DEBUG"}, {"query": "OrderService", "intent": "TRACE"}], max_tokens_per_task=2000)
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `results`, `count`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Strict token-budgeted context slices with coverage scoring and candidate optimization.
+
+#### Non-guarantees
+Does not execute repository code or tests.
+
+#### Typical follow-up
+apply_semantic_patch or safe_rename based on retrieved context
+
+#### Common mistakes
+- Exceeding 5 tasks in a single batch call
+
+#### Example
+- **Developer request**: "Get context packets for both the auth service and the payment processor."
+- **Call**: `batch_get_context(tasks=[{"query": "auth service", "intent": "DEBUG"}, {"query": "payment processor", "intent": "TRACE"}])`
+- **Interpretation**: Inspect results list containing individual ContextPacket dictionaries.
+
+### `batch_get_symbols`
+
+- **Capability**: `batch_symbol_lookup`
+- **Profiles**: `full`
+- **Task Categories**: `SYMBOL_LOOKUP`, `MULTI_FILE_INVESTIGATION`
+
+#### Purpose
+Retrieve authoritative signature, kind, parent scope, decorators, and bounded source snippet for multiple symbols in a single round-trip. Use when inspecting multiple related symbols to minimize turn count and token overhead. Does not traverse multi-hop call graphs.
+
+#### Use when
+- Inspecting multiple symbol declarations concurrently
+- Reducing LLM turn count when exploring related classes and functions
+
+#### Avoid when
+- Only inspecting a single symbol (use get_symbol instead)
+
+#### Required inputs
+`symbols`
+
+#### Optional inputs
+None
+
+#### Minimal invocation
+```python
+batch_get_symbols(symbols=["UserService", "OrderService"])
+```
+
+#### Advanced invocation
+```python
+batch_get_symbols(symbols=["UserService.get_user", "OrderService.create_order"])
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `results`, `count`, `found_count`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Deterministic symbol metadata resolution across Python, TypeScript, JavaScript, and Luau AST definitions.
+
+#### Non-guarantees
+Does not traverse multi-hop call graphs; use batch_find_callers for call hierarchies.
+
+#### Typical follow-up
+batch_find_callers to discover callers of multiple symbols
+
+#### Common mistakes
+- Passing an empty list or exceeding 50 symbols
+
+#### Example
+- **Developer request**: "Inspect the definitions of UserService and OrderService simultaneously."
+- **Call**: `batch_get_symbols(symbols=["UserService", "OrderService"])`
+- **Interpretation**: Inspect results mapping for symbol metadata and bounded snippets.
 
 ### `check_api_drift`
 
@@ -2743,6 +2959,61 @@ find_callers on the writer symbol or get_file on the mutation lines
 - **Developer request**: "Which functions write to the products table?"
 - **Call**: `find_db_writers(table="products")`
 - **Interpretation**: Inspect writers for symbol, operation (INSERT/UPDATE/DELETE), columns, file, and start_line.
+
+### `find_dead_code`
+
+- **Capability**: `dead_code_detection`
+- **Profiles**: `full`
+- **Task Categories**: `DIAGNOSTIC`, `ARCHITECTURE`
+
+#### Purpose
+Detect zero-caller functions, classes, uncalled zombie HTTP routes, and orphaned database tables by cross-referencing AST graphs with runtime traces. Use when identifying unused code, zombie endpoints, or unread/unwritten database tables. Does not prove unobserved paths are impossible when runtime traces are absent.
+
+#### Use when
+- Identifying dead functions and classes before refactoring or cleanup
+- Detecting zombie HTTP endpoints that have never been invoked in production traces
+- Auditing database schemas for orphaned tables with zero readers or writers
+
+#### Avoid when
+- Checking local variables within a single function
+
+#### Required inputs
+None
+
+#### Optional inputs
+`max_symbols`
+
+#### Minimal invocation
+```python
+find_dead_code()
+```
+
+#### Advanced invocation
+```python
+find_dead_code(max_symbols=100)
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `repository`, `dead_symbols`, `zombie_routes`, `orphaned_tables`, `runtime_traces_present`, `total_dead_count`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Deterministic cross-referencing of static AST callers, route tables, DB entity readers/writers, and runtime observations.
+
+#### Non-guarantees
+Does not prove unobserved paths are impossible when runtime traces are absent.
+
+#### Typical follow-up
+safe_rename or get_file to inspect flagged dead symbols
+
+#### Common mistakes
+- Assuming UNOBSERVED_AT_RUNTIME routes are broken when no telemetry has been ingested
+
+#### Example
+- **Developer request**: "Find all unused functions and zombie endpoints in this codebase."
+- **Call**: `find_dead_code()`
+- **Interpretation**: Inspect dead_symbols, zombie_routes, and orphaned_tables lists in the report.
 
 ### `find_references`
 
@@ -4772,6 +5043,60 @@ get_context
 - **Developer request**: "Preview the retrieval plan for tracing payment processing."
 - **Call**: `plan_retrieval(query="Trace payment processing")`
 - **Interpretation**: Inspect steps and expanded_queries, then invoke get_context.
+
+### `preview_semantic_patch`
+
+- **Capability**: `semantic_patch_preview`
+- **Profiles**: `full`
+- **Task Categories**: `LOCAL_EDIT`, `CHANGE_IMPACT`
+
+#### Purpose
+Dry-run preview a multi-file semantic patch across repository files with pre-flight syntax validation and unified diffs. Use when verifying multi-file changes, syntax correctness, and diff previews before applying modifications to disk. Guarantees zero disk mutation during preview. Does not commit modifications to disk.
+
+#### Use when
+- Previewing exact unified diffs before modifying files
+- Validating that proposed code changes are syntactically valid across multiple languages
+
+#### Avoid when
+- Applying the changes to disk immediately (use apply_semantic_patch)
+
+#### Required inputs
+`patches`
+
+#### Optional inputs
+None
+
+#### Minimal invocation
+```python
+preview_semantic_patch(patches=[{"path": "src/main.py", "hunks": [{"target": "foo", "replacement": "bar"}]}])
+```
+
+#### Advanced invocation
+```python
+preview_semantic_patch(patches=[{"path": "src/main.py", "expected_hash": "...", "hunks": [{"target": "...", "replacement": "..."}]}])
+```
+
+#### Result interpretation
+- **Output Type**: `RefactorResult`
+- **Key Fields**: `status`, `files_changed`, `diffs`, `errors`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Zero disk mutation guarantee; pre-flight AST syntax validation for Python, Luau, JSON, and JS/TS.
+
+#### Non-guarantees
+Does not commit modifications to disk; use apply_semantic_patch to commit.
+
+#### Typical follow-up
+apply_semantic_patch if preview diffs and syntax validation are satisfactory
+
+#### Common mistakes
+- Expecting preview_semantic_patch to modify disk files (it is strictly dry-run)
+
+#### Example
+- **Developer request**: "Preview what changes would happen if we replace this method in two files."
+- **Call**: `preview_semantic_patch(patches=[{"path": "app.py", "hunks": [{"target": "old()", "replacement": "new()"}]}])`
+- **Interpretation**: Verify status=='READY' and inspect diffs to ensure edits are exact.
 
 ### `read_file`
 

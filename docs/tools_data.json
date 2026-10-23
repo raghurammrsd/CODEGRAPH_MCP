@@ -5500,5 +5500,378 @@
     "advanced_invocation": "get_monorepo_packages()",
     "evidence": "Deterministic workspace manifest analysis across pnpm, yarn, npm, Turborepo, Cargo, and Poetry.",
     "does_not_prove": "Does not prove build system execution order or runtime dependency loading."
+  },
+  {
+    "name": "batch_get_symbols",
+    "category": "core",
+    "capability": "batch_symbol_lookup",
+    "description": "Retrieve authoritative signature, kind, parent scope, decorators, and bounded source snippet for multiple symbols in a single round-trip. Use when inspecting multiple related symbols to minimize turn count and token overhead. Does not traverse multi-hop call graphs.",
+    "problem_solved": "Inspecting multiple symbol declarations concurrently",
+    "profiles": [
+      "full"
+    ],
+    "required_inputs": [
+      "symbols"
+    ],
+    "optional_inputs": [],
+    "parameters_schema": {
+      "properties": {
+        "symbols": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Symbols",
+          "type": "array"
+        }
+      },
+      "required": [
+        "symbols"
+      ],
+      "title": "batch_get_symbolsArguments",
+      "type": "object"
+    },
+    "return_schema": {
+      "title": "dict[str, Any]",
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "string",
+          "title": "Results"
+        },
+        "count": {
+          "type": "integer",
+          "title": "Count"
+        },
+        "found_count": {
+          "type": "integer",
+          "title": "Found Count"
+        }
+      }
+    },
+    "returns": "dict[str, Any]",
+    "example_invocation": "batch_get_symbols(symbols=[\"UserService\", \"OrderService\"])",
+    "minimal_invocation": "batch_get_symbols(symbols=[\"UserService\", \"OrderService\"])",
+    "advanced_invocation": "batch_get_symbols(symbols=[\"UserService.get_user\", \"OrderService.create_order\"])",
+    "evidence": "Deterministic symbol metadata resolution across Python, TypeScript, JavaScript, and Luau AST definitions.",
+    "does_not_prove": "Does not traverse multi-hop call graphs; use batch_find_callers for call hierarchies."
+  },
+  {
+    "name": "batch_find_callers",
+    "category": "graph",
+    "capability": "batch_caller_discovery",
+    "description": "Find functions and methods calling each of the specified symbols in a single round-trip. Use when querying callers of multiple symbols to reduce round trips and multi-turn latency. Does not prove runtime execution of conditional branches.",
+    "problem_solved": "Tracing caller hierarchies across multiple related functions or methods in one call",
+    "profiles": [
+      "full"
+    ],
+    "required_inputs": [
+      "symbols"
+    ],
+    "optional_inputs": [
+      "max_results_per_symbol"
+    ],
+    "parameters_schema": {
+      "properties": {
+        "symbols": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Symbols",
+          "type": "array"
+        },
+        "max_results_per_symbol": {
+          "default": 10,
+          "title": "Max Results Per Symbol",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "symbols"
+      ],
+      "title": "batch_find_callersArguments",
+      "type": "object"
+    },
+    "return_schema": {
+      "title": "dict[str, Any]",
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "string",
+          "title": "Results"
+        },
+        "count": {
+          "type": "integer",
+          "title": "Count"
+        },
+        "total_callers": {
+          "type": "array",
+          "title": "Total Callers"
+        }
+      }
+    },
+    "returns": "dict[str, Any]",
+    "example_invocation": "batch_find_callers(symbols=[\"AuthService.login\", \"TokenValidator.verify\"])",
+    "minimal_invocation": "batch_find_callers(symbols=[\"AuthService.login\", \"TokenValidator.verify\"])",
+    "advanced_invocation": "batch_find_callers(symbols=[\"AuthService.login\", \"TokenValidator.verify\"], max_results_per_symbol=15)",
+    "evidence": "Verified CALLS relationships with confidence and AST_VERIFIED evidence.",
+    "does_not_prove": "Does not prove runtime execution of conditional branches."
+  },
+  {
+    "name": "batch_get_context",
+    "category": "core",
+    "capability": "batch_context_optimization",
+    "description": "Compile token-bounded, coverage-optimized ContextPackets for multiple task prompts or symbol targets in a single call. Use when retrieving separate focused contexts for different sub-tasks concurrently. Does not execute repository code or tests.",
+    "problem_solved": "Gathering context for multiple sub-goals in parallel",
+    "profiles": [
+      "full"
+    ],
+    "required_inputs": [
+      "tasks"
+    ],
+    "optional_inputs": [
+      "max_tokens_per_task"
+    ],
+    "parameters_schema": {
+      "properties": {
+        "tasks": {
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ],
+          "title": "Tasks"
+        },
+        "max_tokens_per_task": {
+          "default": 2000,
+          "title": "Max Tokens Per Task",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tasks"
+      ],
+      "title": "batch_get_contextArguments",
+      "type": "object"
+    },
+    "return_schema": {
+      "title": "dict[str, Any]",
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "string",
+          "title": "Results"
+        },
+        "count": {
+          "type": "integer",
+          "title": "Count"
+        }
+      }
+    },
+    "returns": "dict[str, Any]",
+    "example_invocation": "batch_get_context(tasks=[{\"query\": \"auth service\", \"intent\": \"DEBUG\"}, {\"query\": \"payment processor\", \"intent\": \"TRACE\"}])",
+    "minimal_invocation": "batch_get_context(tasks=[{\"query\": \"AuthService\"}, {\"query\": \"OrderService\"}])",
+    "advanced_invocation": "batch_get_context(tasks=[{\"query\": \"AuthService\", \"intent\": \"DEBUG\"}, {\"query\": \"OrderService\", \"intent\": \"TRACE\"}], max_tokens_per_task=2000)",
+    "evidence": "Strict token-budgeted context slices with coverage scoring and candidate optimization.",
+    "does_not_prove": "Does not execute repository code or tests."
+  },
+  {
+    "name": "preview_semantic_patch",
+    "category": "core",
+    "capability": "semantic_patch_preview",
+    "description": "Dry-run preview a multi-file semantic patch across repository files with pre-flight syntax validation and unified diffs. Use when verifying multi-file changes, syntax correctness, and diff previews before applying modifications to disk. Guarantees zero disk mutation during preview. Does not commit modifications to disk.",
+    "problem_solved": "Previewing exact unified diffs before modifying files",
+    "profiles": [
+      "full"
+    ],
+    "required_inputs": [
+      "patches"
+    ],
+    "optional_inputs": [],
+    "parameters_schema": {
+      "properties": {
+        "patches": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Patches",
+          "type": "array"
+        }
+      },
+      "required": [
+        "patches"
+      ],
+      "title": "preview_semantic_patchArguments",
+      "type": "object"
+    },
+    "return_schema": {
+      "title": "RefactorResult",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "title": "Status"
+        },
+        "files_changed": {
+          "type": "array",
+          "title": "Files Changed"
+        },
+        "diffs": {
+          "type": "string",
+          "title": "Diffs"
+        },
+        "errors": {
+          "type": "string",
+          "title": "Errors"
+        }
+      }
+    },
+    "returns": "RefactorResult",
+    "example_invocation": "preview_semantic_patch(patches=[{\"path\": \"app.py\", \"hunks\": [{\"target\": \"old()\", \"replacement\": \"new()\"}]}])",
+    "minimal_invocation": "preview_semantic_patch(patches=[{\"path\": \"src/main.py\", \"hunks\": [{\"target\": \"foo\", \"replacement\": \"bar\"}]}])",
+    "advanced_invocation": "preview_semantic_patch(patches=[{\"path\": \"src/main.py\", \"expected_hash\": \"...\", \"hunks\": [{\"target\": \"...\", \"replacement\": \"...\"}]}])",
+    "evidence": "Zero disk mutation guarantee; pre-flight AST syntax validation for Python, Luau, JSON, and JS/TS.",
+    "does_not_prove": "Does not commit modifications to disk; use apply_semantic_patch to commit."
+  },
+  {
+    "name": "apply_semantic_patch",
+    "category": "core",
+    "capability": "semantic_patch_apply",
+    "description": "Atomically apply a multi-file semantic patch across repository files with pre-flight syntax validation and rollback support. Use when executing validated multi-file code modifications with transactional safety and rollback guarantees. Does not prove semantic preservation beyond syntax validation and hash preconditions.",
+    "problem_solved": "Executing multi-file code modifications atomically with rollback safety",
+    "profiles": [
+      "full"
+    ],
+    "required_inputs": [
+      "patches"
+    ],
+    "optional_inputs": [
+      "dry_run"
+    ],
+    "parameters_schema": {
+      "properties": {
+        "patches": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Patches",
+          "type": "array"
+        },
+        "dry_run": {
+          "default": false,
+          "title": "Dry Run",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "patches"
+      ],
+      "title": "apply_semantic_patchArguments",
+      "type": "object"
+    },
+    "return_schema": {
+      "title": "RefactorResult",
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "title": "Status"
+        },
+        "files_changed": {
+          "type": "array",
+          "title": "Files Changed"
+        },
+        "rollback_id": {
+          "type": "string",
+          "title": "Rollback Id"
+        },
+        "diffs": {
+          "type": "string",
+          "title": "Diffs"
+        },
+        "errors": {
+          "type": "string",
+          "title": "Errors"
+        }
+      }
+    },
+    "returns": "RefactorResult",
+    "example_invocation": "apply_semantic_patch(patches=[{\"path\": \"app.py\", \"hunks\": [{\"target\": \"a\", \"replacement\": \"b\"}]}])",
+    "minimal_invocation": "apply_semantic_patch(patches=[{\"path\": \"src/main.py\", \"hunks\": [{\"target\": \"foo\", \"replacement\": \"bar\"}]}])",
+    "advanced_invocation": "apply_semantic_patch(patches=[{\"path\": \"src/main.py\", \"hunks\": [{\"target\": \"foo\", \"replacement\": \"bar\"}]}], dry_run=False)",
+    "evidence": "Precondition hash verification, AST syntax validation, atomic file replacement via os.replace under RefactorLock, and persistent rollback manifest.",
+    "does_not_prove": "Does not prove business logic correctness beyond syntax tree validity."
+  },
+  {
+    "name": "find_dead_code",
+    "category": "core",
+    "capability": "dead_code_detection",
+    "description": "Detect zero-caller functions, classes, uncalled zombie HTTP routes, and orphaned database tables by cross-referencing AST graphs with runtime traces. Use when identifying unused code, zombie endpoints, or unread/unwritten database tables. Does not prove unobserved paths are impossible when runtime traces are absent.",
+    "problem_solved": "Identifying dead functions and classes before refactoring or cleanup",
+    "profiles": [
+      "full"
+    ],
+    "required_inputs": [],
+    "optional_inputs": [
+      "max_symbols"
+    ],
+    "parameters_schema": {
+      "properties": {
+        "max_symbols": {
+          "default": 50,
+          "title": "Max Symbols",
+          "type": "integer"
+        }
+      },
+      "title": "find_dead_codeArguments",
+      "type": "object"
+    },
+    "return_schema": {
+      "title": "dict[str, Any]",
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "title": "Repository"
+        },
+        "dead_symbols": {
+          "type": "array",
+          "title": "Dead Symbols"
+        },
+        "zombie_routes": {
+          "type": "array",
+          "title": "Zombie Routes"
+        },
+        "orphaned_tables": {
+          "type": "array",
+          "title": "Orphaned Tables"
+        },
+        "runtime_traces_present": {
+          "type": "string",
+          "title": "Runtime Traces Present"
+        },
+        "total_dead_count": {
+          "type": "integer",
+          "title": "Total Dead Count"
+        }
+      }
+    },
+    "returns": "dict[str, Any]",
+    "example_invocation": "find_dead_code()",
+    "minimal_invocation": "find_dead_code()",
+    "advanced_invocation": "find_dead_code(max_symbols=100)",
+    "evidence": "Deterministic cross-referencing of static AST callers, route tables, DB entity readers/writers, and runtime observations.",
+    "does_not_prove": "Does not prove unobserved paths are impossible when runtime traces are absent."
   }
 ]

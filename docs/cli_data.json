@@ -178,7 +178,7 @@
     "command": "codegraph git-diff [base] [head]",
     "category": "Git Intelligence",
     "summary": "Compute structural AST-level difference between Git revisions, commits, or branches.",
-    "problem_solved": "Detects added, removed, and modified functions, classes, and parameter signatures—not merely raw textual line diffs.",
+    "problem_solved": "Detects added, removed, and modified functions, classes, and parameter signatures\u2014not merely raw textual line diffs.",
     "flags": [
       "--branch, -b: Perform hierarchical branch architecture comparison",
       "--json: Output structural diff as JSON"
@@ -198,13 +198,13 @@
       "--json: Output impact as JSON"
     ],
     "example": "codegraph git-impact --tree",
-    "output": "Impact Tree for commit 3d71eca:\n└── src/services/auth.py (AuthService.verify_token)\n    ├── [CALLER] api.routes.auth (login_handler)\n    │   └── [ROUTE] POST /api/v1/auth/login\n    ├── [DB_WRITER] models.user (update_last_login)\n    └── [TEST] tests/test_auth.py::test_verify_token"
+    "output": "Impact Tree for commit 3d71eca:\n\u2514\u2500\u2500 src/services/auth.py (AuthService.verify_token)\n    \u251c\u2500\u2500 [CALLER] api.routes.auth (login_handler)\n    \u2502   \u2514\u2500\u2500 [ROUTE] POST /api/v1/auth/login\n    \u251c\u2500\u2500 [DB_WRITER] models.user (update_last_login)\n    \u2514\u2500\u2500 [TEST] tests/test_auth.py::test_verify_token"
   },
   {
     "command": "codegraph git-conflicts [base] [head]",
     "category": "Git Intelligence",
     "summary": "Detect semantic and contract merge conflicts between branches before merge.",
-    "problem_solved": "Flags silent merge conflicts that standard Git merges miss—such as branch A calling a function or route handler that branch B deleted or altered.",
+    "problem_solved": "Flags silent merge conflicts that standard Git merges miss\u2014such as branch A calling a function or route handler that branch B deleted or altered.",
     "flags": [
       "--repository, -r <path>: Repository path",
       "--json: Output conflicts as JSON"
@@ -269,5 +269,55 @@
     ],
     "example": "codegraph roblox routes .",
     "output": "Roblox Client \u2194 Server Routes:\n  ClientController:EquipItem\n    --[CLIENT_DISPATCHES_REMOTE]--> ReplicatedStorage.Remotes.Inventory\n    --[SERVER_HANDLES_REMOTE]-----> InventoryService:Init\n    --[WRITES_PERSISTENCE]--------> persistence.roblox.datastore.PlayerInventory_v1"
+  },
+  {
+    "command": "codegraph dead-code [PATH]",
+    "category": "Health & Freshness",
+    "summary": "Detect uncalled dead symbols, zombie HTTP routes, and orphaned database tables.",
+    "problem_solved": "Identifies functions/classes with zero static callers and zero runtime invocations, HTTP endpoints unreached at runtime, and database tables with zero readers or writers.",
+    "flags": [
+      "--repository, -r <path>: Repository path",
+      "--max-symbols, -m <int>: Max dead symbols to display (default: 50)",
+      "--json: Output raw JSON report"
+    ],
+    "example": "codegraph dead-code . --json",
+    "output": "CodeGraph Dead Code & Zombie Route Report for my-app:\n  Runtime Telemetry: PRESENT\n  Total Flagged:     7\n    Dead Symbols:    4\n    Zombie Routes:   2\n    Orphaned Tables: 1"
+  },
+  {
+    "command": "codegraph otel-listen [PATH]",
+    "category": "Runtime Telemetry",
+    "summary": "Run embedded OpenTelemetry (OTLP/HTTP) trace receiver streaming into .codegraph.sqlite3.",
+    "problem_solved": "Receives standard OTLP/HTTP /v1/traces spans over port 4318, decompressing gzip and reconciling runtime call graphs into SQLite without external collector infrastructure.",
+    "flags": [
+      "--port, -p <int>: Listening port (default: 4318)",
+      "--host, -h <str>: Listening host (default: 127.0.0.1)",
+      "--repository, -r <path>: Repository path"
+    ],
+    "example": "codegraph otel-listen --port 4318",
+    "output": "CodeGraph OTLP HTTP Receiver listening on http://127.0.0.1:4318/v1/traces\nExport traces using: export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318\n[OTLP] Ingested trace batch: 12 spans -> 8 runtime graph edges"
+  },
+  {
+    "command": "codegraph lsp [PATH]",
+    "category": "Agent Onboarding",
+    "summary": "Run Language Server Protocol (LSP) server over stdio for IDE integration.",
+    "problem_solved": "Integrates CodeGraph intelligence directly into VS Code, Neovim, and Helix via standard LSP JSON-RPC (definitions, references, document symbols, and blast radius CodeLens).",
+    "flags": [
+      "--repository, -r <path>: Repository path"
+    ],
+    "example": "codegraph lsp .",
+    "output": "[CodeGraph LSP] JSON-RPC stdio server listening for client requests (pid=45210)"
+  },
+  {
+    "command": "codegraph refactor patch <PATCH_FILE>",
+    "category": "Core Lifecycle",
+    "summary": "Atomically preview or apply multi-file semantic patches with pre-flight syntax validation and rollback.",
+    "problem_solved": "Enables AI agents to apply transactional multi-file edits with 0 disk mutations on dry run, target string verification, syntax validation (Python, Luau, JS, TS, JSON), and automatic manifest rollback on failure.",
+    "flags": [
+      "--dry-run, -d: Preview patch diff and affected symbols without modifying disk",
+      "--repository, -r <path>: Repository path",
+      "--json: Output patch transaction result as JSON"
+    ],
+    "example": "codegraph refactor patch patch_spec.json --dry-run",
+    "output": "{\n  \"status\": \"APPLIED\",\n  \"files_modified\": 2,\n  \"hunks_applied\": 3,\n  \"rollback_manifest\": \".codegraph/rollback_manifest.json\"\n}"
   }
 ]

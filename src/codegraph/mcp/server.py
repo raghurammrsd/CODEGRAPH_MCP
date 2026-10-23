@@ -1011,6 +1011,12 @@ def create_server(
         from codegraph.monorepo import discover_workspace
         return discover_workspace(indexer.repository).as_dict()
 
+    def find_dead_code(max_symbols: int = 50) -> dict[str, Any]:
+        """Detect zero-caller functions, classes, uncalled zombie HTTP routes, and orphaned database tables by cross-referencing AST graphs with runtime traces. Use when identifying unused code, zombie endpoints, or unread/unwritten database tables. Does not prove unobserved paths are impossible when runtime traces are absent."""
+        from codegraph.dead_code import analyze_dead_code
+        with indexer.session() as con:
+            return analyze_dead_code(con, indexer.repository, max_symbols=max_symbols).as_dict()
+
     # -----------------------------------------------------------------------
     # Git Intelligence Tools (5 Unified Capabilities)
     # -----------------------------------------------------------------------
@@ -1117,6 +1123,100 @@ def create_server(
                 pass
         return result.to_dict()
 
+    def batch_get_symbols(symbols: list[str]) -> dict[str, Any]:
+        """Retrieve declaration metadata, signature, kind, and source snippet for multiple symbols in a single round-trip.
+        Reduces LLM latency and tool call overhead when inspecting multiple related symbols. Bounded to 50 symbols max."""
+        bounded_symbols = symbols[:50]
+        results: dict[str, Any] = {}
+        with indexer.session() as con:
+            for s in bounded_symbols:
+                s_str = str(s).strip()
+                if not s_str:
+                    continue
+                results[s_str] = interrogation_get_symbol(con, indexer.repository, symbol=s_str)
+        return {
+            "results": results,
+            "count": len(results),
+            "found_count": sum(1 for r in results.values() if r.get("status") != "NOT_FOUND"),
+        }
+
+    def batch_find_callers(symbols: list[str], max_results_per_symbol: int = 10) -> dict[str, Any]:
+        """Find functions and methods calling each of the specified symbols in a single round-trip.
+        Reduces multi-hop turn count for AI coding agents. Bounded to 30 symbols max."""
+        bounded_symbols = symbols[:30]
+        results: dict[str, Any] = {}
+        with indexer.session() as con:
+            for s in bounded_symbols:
+                s_str = str(s).strip()
+                if not s_str:
+                    continue
+                results[s_str] = [dict(r) for r in graph_find_callers(con, s_str, max_results=max_results_per_symbol)]
+        return {
+            "results": results,
+            "count": len(results),
+            "total_callers": sum(len(c) for c in results.values()),
+        }
+
+    def batch_get_context(
+        tasks: list[dict[str, Any]] | list[str],
+        max_tokens_per_task: int = 2000,
+    ) -> dict[str, Any]:
+        """Compile token-bounded, coverage-optimized ContextPackets for multiple task prompts or symbol targets in a single call.
+        Enables agents to retrieve separate contexts for different sub-tasks in one request. Bounded to 5 tasks max."""
+        bounded_tasks = tasks[:5]
+        results: list[dict[str, Any]] = []
+        with indexer.session() as con:
+            for t in bounded_tasks:
+                effective_task = t if isinstance(t, str) else t.get("query") or t.get("task") or str(t)
+                effective_intent = t.get("intent") if isinstance(t, dict) else None
+                packet = compile_context(
+                    con,
+                    indexer.repository,
+                    task=effective_task,
+                    intent=effective_intent,
+                    max_tokens=max_tokens_per_task,
+                    mode="FAST",
+                )
+                results.append(packet.as_dict())
+        return {
+            "results": results,
+            "count": len(results),
+        }
+
+    def preview_semantic_patch(
+        patches: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Dry-run preview a multi-file semantic patch across repository files with syntax validation and unified diffs.
+        Invariants: Zero disk mutation; pre-flight AST validation for Python, Luau, JSON, and JS/TS; boundary checks. Does not commit modifications to disk."""
+        from codegraph.refactor.patcher import preview_semantic_patch as do_preview
+
+        result = do_preview(
+            repository=indexer.repository,
+            patch_specs=patches,
+        )
+        return result.to_dict()
+
+    def apply_semantic_patch(
+        patches: list[dict[str, Any]],
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Atomically apply a multi-file semantic patch with pre-flight syntax validation and rollback support.
+        When dry_run=False: checks preconditions and hashes, validates syntax in memory, commits atomically using sibling temp files and os.replace under RefactorLock, persists a rollback manifest, and triggers an incremental index update."""
+        from codegraph.refactor.models import RefactorStatus
+        from codegraph.refactor.patcher import apply_semantic_patch as do_apply
+
+        result = do_apply(
+            repository=indexer.repository,
+            patch_specs=patches,
+            dry_run=dry_run,
+        )
+        if result.status == RefactorStatus.APPLIED:
+            try:
+                indexer.index()
+            except Exception:
+                pass
+        return result.to_dict()
+
     core_tools: dict[str, Any] = {
         "resolve_symbol": resolve_symbol,
         "search_symbols": search_symbols,
@@ -1145,6 +1245,14 @@ def create_server(
     refactor_tools: dict[str, Any] = {
         "safe_rename": safe_rename,
         "rollback_refactor": rollback_refactor,
+        "preview_semantic_patch": preview_semantic_patch,
+        "apply_semantic_patch": apply_semantic_patch,
+    }
+
+    batch_tools: dict[str, Any] = {
+        "batch_get_symbols": batch_get_symbols,
+        "batch_find_callers": batch_find_callers,
+        "batch_get_context": batch_get_context,
     }
 
     # Map of all available tools
@@ -1152,6 +1260,7 @@ def create_server(
         **core_tools,
         **git_intelligence_tools,
         **refactor_tools,
+        **batch_tools,
         "search_code": search_code,
         "read_file": read_file,
         "find_symbol": find_symbol,
@@ -1201,6 +1310,7 @@ def create_server(
         "get_distributed_trace": get_distributed_trace,
         "check_api_drift": check_api_drift,
         "get_monorepo_packages": get_monorepo_packages,
+        "find_dead_code": find_dead_code,
     }
 
     agent_names = {

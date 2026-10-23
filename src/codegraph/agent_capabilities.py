@@ -160,6 +160,12 @@ ROUTING_MANIFEST: dict[str, str] = {
     "semantic_conflicts": "detect_semantic_conflicts",
     "safe_rename": "safe_rename",
     "rollback_refactor": "rollback_refactor",
+    "batch_symbols": "batch_get_symbols",
+    "batch_callers": "batch_find_callers",
+    "batch_context": "batch_get_context",
+    "semantic_patch_preview": "preview_semantic_patch",
+    "semantic_patch_apply": "apply_semantic_patch",
+    "dead_code": "find_dead_code",
 }
 
 DEFAULT_AGENT_PROFILE_TOOLS: tuple[str, ...] = (
@@ -2934,6 +2940,235 @@ TOOL_CAPABILITY_REGISTRY: tuple[ToolCapabilitySpec, ...] = (
         example_call="get_monorepo_packages()",
         example_interpretation="Inspect packages mapping to understand package names, root paths, and dependencies.",
     ),
+    # 71. batch_get_symbols
+    ToolCapabilitySpec(
+        tool_name="batch_get_symbols",
+        capability="batch_symbol_lookup",
+        description=(
+            "Retrieve authoritative signature, kind, parent scope, decorators, and bounded source snippet for multiple symbols in a single round-trip. "
+            "Use when inspecting multiple related symbols to minimize turn count and token overhead. "
+            "Does not traverse multi-hop call graphs."
+        ),
+        task_types=(
+            AgentTaskCategory.SYMBOL_LOOKUP.value,
+            AgentTaskCategory.MULTI_FILE_INVESTIGATION.value,
+        ),
+        required_inputs=("symbols",),
+        optional_inputs=(),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Deterministic symbol metadata resolution across Python, TypeScript, JavaScript, and Luau AST definitions.",
+        does_not_prove="Does not traverse multi-hop call graphs; use batch_find_callers for call hierarchies.",
+        useful_situations=(
+            "Inspecting multiple symbol declarations concurrently",
+            "Reducing LLM turn count when exploring related classes and functions",
+        ),
+        avoid_when=(
+            "Only inspecting a single symbol (use get_symbol instead)",
+        ),
+        profiles=("full",),
+        minimal_invocation='batch_get_symbols(symbols=["UserService", "OrderService"])',
+        advanced_invocation='batch_get_symbols(symbols=["UserService.get_user", "OrderService.create_order"])',
+        result_fields=("results", "count", "found_count"),
+        typical_followup="batch_find_callers to discover callers of multiple symbols",
+        common_mistakes=(
+            "Passing an empty list or exceeding 50 symbols",
+        ),
+        example_request="Inspect the definitions of UserService and OrderService simultaneously.",
+        example_call='batch_get_symbols(symbols=["UserService", "OrderService"])',
+        example_interpretation="Inspect results mapping for symbol metadata and bounded snippets.",
+    ),
+    # 72. batch_find_callers
+    ToolCapabilitySpec(
+        tool_name="batch_find_callers",
+        capability="batch_caller_discovery",
+        description=(
+            "Find functions and methods calling each of the specified symbols in a single round-trip. "
+            "Use when querying callers of multiple symbols to reduce round trips and multi-turn latency. "
+            "Does not prove runtime execution of conditional branches."
+        ),
+        task_types=(
+            AgentTaskCategory.RELATIONSHIP.value,
+            AgentTaskCategory.TRACE.value,
+        ),
+        required_inputs=("symbols",),
+        optional_inputs=("max_results_per_symbol",),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=("CALLS",),
+        evidence_guarantees="Verified CALLS relationships with confidence and AST_VERIFIED evidence.",
+        does_not_prove="Does not prove runtime execution of conditional branches.",
+        useful_situations=(
+            "Tracing caller hierarchies across multiple related functions or methods in one call",
+            "Assessing blast radius of multiple symbols simultaneously",
+        ),
+        avoid_when=(
+            "Only querying callers for a single symbol (use find_callers or get_callers)",
+        ),
+        profiles=("full",),
+        minimal_invocation='batch_find_callers(symbols=["AuthService.login", "TokenValidator.verify"])',
+        advanced_invocation='batch_find_callers(symbols=["AuthService.login", "TokenValidator.verify"], max_results_per_symbol=15)',
+        result_fields=("results", "count", "total_callers"),
+        typical_followup="get_file on specific caller locations",
+        common_mistakes=(
+            "Expecting callee discovery instead of caller discovery (use find_callees)",
+        ),
+        example_request="Who calls AuthService.login and TokenValidator.verify?",
+        example_call='batch_find_callers(symbols=["AuthService.login", "TokenValidator.verify"])',
+        example_interpretation="Inspect results mapping to see callers for each requested symbol.",
+    ),
+    # 73. batch_get_context
+    ToolCapabilitySpec(
+        tool_name="batch_get_context",
+        capability="batch_context_optimization",
+        description=(
+            "Compile token-bounded, coverage-optimized ContextPackets for multiple task prompts or symbol targets in a single call. "
+            "Use when retrieving separate focused contexts for different sub-tasks concurrently. "
+            "Does not execute repository code or tests."
+        ),
+        task_types=(
+            AgentTaskCategory.MULTI_FILE_INVESTIGATION.value,
+            AgentTaskCategory.DEBUG.value,
+        ),
+        required_inputs=("tasks",),
+        optional_inputs=("max_tokens_per_task",),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Strict token-budgeted context slices with coverage scoring and candidate optimization.",
+        does_not_prove="Does not execute repository code or tests.",
+        useful_situations=(
+            "Gathering context for multiple sub-goals in parallel",
+            "Synthesizing separate context packets for independent components",
+        ),
+        avoid_when=(
+            "Only querying for a single task context (use get_context)",
+        ),
+        profiles=("full",),
+        minimal_invocation='batch_get_context(tasks=[{"query": "AuthService"}, {"query": "OrderService"}])',
+        advanced_invocation='batch_get_context(tasks=[{"query": "AuthService", "intent": "DEBUG"}, {"query": "OrderService", "intent": "TRACE"}], max_tokens_per_task=2000)',
+        result_fields=("results", "count"),
+        typical_followup="apply_semantic_patch or safe_rename based on retrieved context",
+        common_mistakes=(
+            "Exceeding 5 tasks in a single batch call",
+        ),
+        example_request="Get context packets for both the auth service and the payment processor.",
+        example_call='batch_get_context(tasks=[{"query": "auth service", "intent": "DEBUG"}, {"query": "payment processor", "intent": "TRACE"}])',
+        example_interpretation="Inspect results list containing individual ContextPacket dictionaries.",
+    ),
+    # 74. preview_semantic_patch
+    ToolCapabilitySpec(
+        tool_name="preview_semantic_patch",
+        capability="semantic_patch_preview",
+        description=(
+            "Dry-run preview a multi-file semantic patch across repository files with pre-flight syntax validation and unified diffs. "
+            "Use when verifying multi-file changes, syntax correctness, and diff previews before applying modifications to disk. "
+            "Guarantees zero disk mutation during preview. Does not commit modifications to disk."
+        ),
+        task_types=(
+            AgentTaskCategory.LOCAL_EDIT.value,
+            AgentTaskCategory.CHANGE_IMPACT.value,
+        ),
+        required_inputs=("patches",),
+        optional_inputs=(),
+        expected_output_type="RefactorResult",
+        relationship_types_returned=(),
+        evidence_guarantees="Zero disk mutation guarantee; pre-flight AST syntax validation for Python, Luau, JSON, and JS/TS.",
+        does_not_prove="Does not commit modifications to disk; use apply_semantic_patch to commit.",
+        useful_situations=(
+            "Previewing exact unified diffs before modifying files",
+            "Validating that proposed code changes are syntactically valid across multiple languages",
+        ),
+        avoid_when=(
+            "Applying the changes to disk immediately (use apply_semantic_patch)",
+        ),
+        profiles=("full",),
+        minimal_invocation='preview_semantic_patch(patches=[{"path": "src/main.py", "hunks": [{"target": "foo", "replacement": "bar"}]}])',
+        advanced_invocation='preview_semantic_patch(patches=[{"path": "src/main.py", "expected_hash": "...", "hunks": [{"target": "...", "replacement": "..."}]}])',
+        result_fields=("status", "files_changed", "diffs", "errors"),
+        typical_followup="apply_semantic_patch if preview diffs and syntax validation are satisfactory",
+        common_mistakes=(
+            "Expecting preview_semantic_patch to modify disk files (it is strictly dry-run)",
+        ),
+        example_request="Preview what changes would happen if we replace this method in two files.",
+        example_call='preview_semantic_patch(patches=[{"path": "app.py", "hunks": [{"target": "old()", "replacement": "new()"}]}])',
+        example_interpretation="Verify status=='READY' and inspect diffs to ensure edits are exact.",
+    ),
+    # 75. apply_semantic_patch
+    ToolCapabilitySpec(
+        tool_name="apply_semantic_patch",
+        capability="semantic_patch_apply",
+        description=(
+            "Atomically apply a multi-file semantic patch across repository files with pre-flight syntax validation and rollback support. "
+            "Use when executing validated multi-file code modifications with transactional safety and rollback guarantees. "
+            "Does not prove semantic preservation beyond syntax validation and hash preconditions."
+        ),
+        task_types=(
+            AgentTaskCategory.LOCAL_EDIT.value,
+            AgentTaskCategory.CHANGE_IMPACT.value,
+        ),
+        required_inputs=("patches",),
+        optional_inputs=("dry_run",),
+        expected_output_type="RefactorResult",
+        relationship_types_returned=(),
+        evidence_guarantees="Precondition hash verification, AST syntax validation, atomic file replacement via os.replace under RefactorLock, and persistent rollback manifest.",
+        does_not_prove="Does not prove business logic correctness beyond syntax tree validity.",
+        useful_situations=(
+            "Executing multi-file code modifications atomically with rollback safety",
+            "Ensuring syntax errors never corrupt source files on disk",
+        ),
+        avoid_when=(
+            "Only previewing changes without touching disk (use preview_semantic_patch or dry_run=True)",
+        ),
+        profiles=("full",),
+        minimal_invocation='apply_semantic_patch(patches=[{"path": "src/main.py", "hunks": [{"target": "foo", "replacement": "bar"}]}])',
+        advanced_invocation='apply_semantic_patch(patches=[{"path": "src/main.py", "hunks": [{"target": "foo", "replacement": "bar"}]}], dry_run=False)',
+        result_fields=("status", "files_changed", "rollback_id", "diffs", "errors"),
+        typical_followup="rollback_refactor if rollback needed, or find_tests to verify test suite",
+        common_mistakes=(
+            "Passing invalid syntax or target hunks that do not match current disk files",
+        ),
+        example_request="Apply this multi-file patch to app.py and config.json atomically.",
+        example_call='apply_semantic_patch(patches=[{"path": "app.py", "hunks": [{"target": "a", "replacement": "b"}]}])',
+        example_interpretation="Verify status=='APPLIED' and save rollback_id for potential rollback.",
+    ),
+    # 76. find_dead_code
+    ToolCapabilitySpec(
+        tool_name="find_dead_code",
+        capability="dead_code_detection",
+        description=(
+            "Detect zero-caller functions, classes, uncalled zombie HTTP routes, and orphaned database tables by cross-referencing AST graphs with runtime traces. "
+            "Use when identifying unused code, zombie endpoints, or unread/unwritten database tables. "
+            "Does not prove unobserved paths are impossible when runtime traces are absent."
+        ),
+        task_types=(
+            AgentTaskCategory.DIAGNOSTIC.value,
+            AgentTaskCategory.ARCHITECTURE.value,
+        ),
+        required_inputs=(),
+        optional_inputs=("max_symbols",),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Deterministic cross-referencing of static AST callers, route tables, DB entity readers/writers, and runtime observations.",
+        does_not_prove="Does not prove unobserved paths are impossible when runtime traces are absent.",
+        useful_situations=(
+            "Identifying dead functions and classes before refactoring or cleanup",
+            "Detecting zombie HTTP endpoints that have never been invoked in production traces",
+            "Auditing database schemas for orphaned tables with zero readers or writers",
+        ),
+        avoid_when=(
+            "Checking local variables within a single function",
+        ),
+        profiles=("full",),
+        minimal_invocation="find_dead_code()",
+        advanced_invocation="find_dead_code(max_symbols=100)",
+        result_fields=("repository", "dead_symbols", "zombie_routes", "orphaned_tables", "runtime_traces_present", "total_dead_count"),
+        typical_followup="safe_rename or get_file to inspect flagged dead symbols",
+        common_mistakes=(
+            "Assuming UNOBSERVED_AT_RUNTIME routes are broken when no telemetry has been ingested",
+        ),
+        example_request="Find all unused functions and zombie endpoints in this codebase.",
+        example_call="find_dead_code()",
+        example_interpretation="Inspect dead_symbols, zombie_routes, and orphaned_tables lists in the report.",
+    ),
 )
 
 _TOOL_BY_NAME: dict[str, ToolCapabilitySpec] = {t.tool_name: t for t in TOOL_CAPABILITY_REGISTRY}
@@ -3240,11 +3475,15 @@ MCP_PROFILE_RECOMMENDATIONS: dict[str, dict[str, object]] = {
     },
     "full": {
         "profile": "full",
-        "tool_count": 70,
+        "tool_count": 76,
         "recommended_for": "Complete diagnostic, database intelligence, runtime reconciliation, benchmark, and repository administration sessions",
         "included_tools": [
             "analyze_change_impact",
             "analyze_impact",
+            "apply_semantic_patch",
+            "batch_find_callers",
+            "batch_get_context",
+            "batch_get_symbols",
             "check_api_drift",
             "check_context_freshness",
             "check_db_drift",
@@ -3262,6 +3501,7 @@ MCP_PROFILE_RECOMMENDATIONS: dict[str, dict[str, object]] = {
             "find_db_relationships",
             "find_db_tables",
             "find_db_writers",
+            "find_dead_code",
             "find_references",
             "find_related_tests",
             "find_routes",
@@ -3300,6 +3540,7 @@ MCP_PROFILE_RECOMMENDATIONS: dict[str, dict[str, object]] = {
             "ingest_runtime_traces",
             "list_routes",
             "plan_retrieval",
+            "preview_semantic_patch",
             "read_file",
             "reconcile_static_runtime",
             "resolve_symbol",

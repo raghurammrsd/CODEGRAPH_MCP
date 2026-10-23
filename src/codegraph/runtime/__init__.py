@@ -12,6 +12,10 @@ from .models import (
     RuntimeAggregatedEdge,
     RuntimeEvent,
 )
+from .otel_receiver import (
+    OTLPReceiver,
+    run_otel_listener,
+)
 from .reconciliation import (
     get_runtime_trace,
     reconcile_static_runtime,
@@ -20,9 +24,11 @@ from .reconciliation import (
 __all__ = [
     "DEFAULT_MAX_INGEST_EVENTS",
     "DEFAULT_RETENTION_OBSERVATIONS",
+    "OTLPReceiver",
     "ReconciliationStatus",
     "RuntimeAggregatedEdge",
     "RuntimeEvent",
+    "run_otel_listener",
     "ServiceEndpoint",
     "discover_live_listening_ports",
     "discover_static_configured_ports",
