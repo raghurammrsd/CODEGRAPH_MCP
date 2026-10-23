@@ -146,7 +146,7 @@ The CodeGraph VS Code extension brings deterministic repository intelligence dir
 ```bash
 # Package and install the extension
 cd vscode-extension
-code --install-extension codegraph-3.0.0.vsix
+code --install-extension codegraph-3.0.1.vsix
 ```
 
 Features included in the VS Code sidebar:
@@ -206,14 +206,14 @@ CodeGraph **v3.0.1** is the production-grade codebase intelligence engine for AI
 
 ### Key Feature Highlights
 
-- ⚡ **Microsecond CSR Traversal**: Traverses call chains and impact graphs across 100k+ edges in microseconds via binary Compressed Sparse Row matrices (`graph_csr.py`).
-- 🧠 **97 Verified FastMCP Tools**: 100% audit pass rate across all registered FastMCP tools for Claude Code, Cursor, Antigravity, and Cline.
-- 📉 **65% to 85% Token Reduction**: Returns compact, bounded AST context packets (~510 tokens) rather than dumping entire multi-thousand-line files.
-- 🌐 **7 Languages Native Support**: Python, TypeScript/JavaScript, Roblox/Luau, Go, Rust, Java, and C/C++.
-- 🛡️ **Zero Hallucinated Edges**: Every caller, route, and database relationship is compiler-verified (`AST_VERIFIED` / `FRAMEWORK_VERIFIED`).
-- 🪟 **Universal Cross-Platform**: Native Windows `kernel32` process inspection, cp1252/UTF-8 terminal safety, and `python -m codegraph` execution out of the box.
-- 🔄 **Sub-15ms Live Watcher**: Instant OS kernel push synchronization (macOS FSEvents, Linux inotify, Windows ReadDirectoryChangesW).
-- 🎮 **Roblox & Luau Intelligence**: Client-server remote hopping, Rojo file tree mapping, and DataStore persistence lineage.
+- **Microsecond CSR Traversal**: Traverses call chains and impact graphs across 100k+ edges in microseconds via binary Compressed Sparse Row matrices (`graph_csr.py`).
+- **97 Verified FastMCP Tools**: 100% audit pass rate across all registered FastMCP tools for Claude Code, Cursor, Antigravity, and Cline.
+- **65% to 85% Token Reduction**: Returns compact, bounded AST context packets (~510 tokens) rather than dumping entire multi-thousand-line files.
+- **7 Languages Native Support**: Python, TypeScript/JavaScript, Roblox/Luau, Go, Rust, Java, and C/C++.
+- **Zero Hallucinated Edges**: Every caller, route, and database relationship is compiler-verified (`AST_VERIFIED` / `FRAMEWORK_VERIFIED`).
+- **Universal Cross-Platform**: Native Windows `kernel32` process inspection, cp1252/UTF-8 terminal safety, and `python -m codegraph` execution out of the box.
+- **Sub-15ms Live Watcher**: Instant OS kernel push synchronization (macOS FSEvents, Linux inotify, Windows ReadDirectoryChangesW).
+- **Roblox & Luau Intelligence**: Client-server remote hopping, Rojo file tree mapping, and DataStore persistence lineage.
 
 ---
 
@@ -287,9 +287,9 @@ With CodeGraph MCP (Targeted AST Slices & Evidence):
 
 ---
 
-## 2. Quickstart (30-Second Setup)
+## 2. Quickstart & Agent Installation
 
-### Step 1: Install the Package
+### Step 1: Install `codegraph-engine`
 
 ```bash
 # macOS / Linux
@@ -298,37 +298,114 @@ pip install "codegraph-engine[mcp]"
 # Windows (PowerShell or Command Prompt)
 python -m pip install "codegraph-engine[mcp]"
 
-# Universal verification (works on all platforms even if Scripts/ is not on PATH)
+# Universal execution verification (works on all platforms even if Scripts/ is not on PATH)
 python -m codegraph --version
 ```
 
 > **Windows Portability:** CodeGraph v3.0.1 includes native Windows cp1252/UTF-8 terminal encoding safety, zero-dependency Win32 `kernel32` process inspection, and direct module-level execution via `python -m codegraph`. If the Windows `Scripts\` directory is not in your system `PATH`, executing `python -m codegraph <command>` works out of the box across PowerShell, CMD, and Windows Terminal.
 
-### Step 2: Configure Your AI Coding Agents (`codegraph install`)
+---
 
-CodeGraph MCP includes an interactive, idempotent onboarding installer ([`src/codegraph/installer.py`](src/codegraph/installer.py)) that detects installed AI coding agents (**Claude Code**, **Cursor**, **Antigravity**, **Codex CLI**, **Gemini CLI**, and **Cline**), configures `mcpServers.codegraph`, installs marker-bounded routing instructions (`<!-- CODEGRAPH:START -->` … `<!-- CODEGRAPH:END -->`), and verifies server health:
+### Step 2: Connect Your AI Coding Agents (`codegraph install --target`)
+
+CodeGraph MCP includes an automated, idempotent onboarding installer ([`src/codegraph/installer.py`](src/codegraph/installer.py)) that detects installed agents, configures `mcpServers.codegraph`, installs marker-bounded routing instructions (`<!-- CODEGRAPH:START -->` … `<!-- CODEGRAPH:END -->`), and verifies server health.
+
+#### Primary Target Commands (`--target`)
+
+Run `codegraph install` targeting your specific AI coding agent(s):
 
 ```bash
-# Interactive setup (detects installed agents, previews planned changes, asks confirmation)
-codegraph install
+# Target Claude Code (configures .mcp.json and CLAUDE.md)
+codegraph install --target claude --yes
 
-# Non-interactive setup for all detected agents in the current project
-codegraph install --yes --target auto --location local
+# Target Cursor (configures .cursor/mcp.json, .cursorrules, and .cursor/rules/codegraph.md)
+codegraph install --target cursor --yes
 
-# Preview exact file modifications without writing anything
-codegraph install --dry-run
+# Target Google Antigravity / Gemini (configures .agents/mcp_config.json, AGENTS.md, and skills)
+codegraph install --target antigravity --yes
+
+# Target Cline / Roo Code (configures .cline/mcp_settings.json and .clinerules)
+codegraph install --target cline --yes
+
+# Target Codex CLI (configures .codex/mcp_config.json and AGENTS.md)
+codegraph install --target codex --yes
+
+# Target Gemini CLI (configures .gemini/settings.json and GEMINI.md)
+codegraph install --target gemini --yes
+
+# Target multiple agents simultaneously
+codegraph install --target claude,cursor,antigravity --yes
+
+# Auto-detect all installed agents in the project / environment
+codegraph install --target auto --yes
+
+# Configure ALL supported agents at once
+codegraph install --target all --yes
 ```
+
+#### Installation Scopes (`--location`)
+
+```bash
+# Local Project Scope (Default): Configures the current repository directory
+codegraph install --target claude --location local --yes
+
+# Global Scope: Configures your user home directory (~/.claude.json, ~/.cursor/mcp.json, etc.)
+codegraph install --target cursor --location global --yes
+```
+
+#### Safe Previews, Manual Config & Repairs
+
+```bash
+# Dry-Run Preview: View planned file changes without modifying anything on disk
+codegraph install --target all --dry-run
+
+# Print Config Only: Output exact JSON snippet for manual pasting into GUI settings
+codegraph install --print-config claude
+codegraph install --print-config cursor
+codegraph install --print-config antigravity
+
+# Automatic Config Repair: Backs up and repairs corrupted or outdated MCP settings
+codegraph install --target auto --repair --yes
+
+# Clean Uninstall: Safely removes CodeGraph integration while preserving user files
+codegraph uninstall --target claude,cursor --yes
+
+# Uninitialize: Removes only the local repository index (.codegraph.sqlite3)
+codegraph uninit --yes
+```
+
+#### What `codegraph install` Configures Per Agent:
+
+| Target Agent (`--target`) | MCP Configuration File | Marker-Bounded Instructions | Skills & Rules |
+| :--- | :--- | :--- | :--- |
+| **`claude`** (Claude Code) | `.mcp.json` (local) / `~/.claude.json` (global) | `CLAUDE.md` | Marker section |
+| **`cursor`** (Cursor) | `.cursor/mcp.json` | `.cursorrules` | `.cursor/rules/codegraph.md` |
+| **`antigravity`** (Antigravity) | `.agents/mcp_config.json` | `AGENTS.md` | `.agents/rules/` & `.agents/skills/` |
+| **`cline`** (Cline / Roo Code) | `.cline/mcp_settings.json` | `.clinerules` | `.cline/rules/codegraph.md` |
+| **`codex`** (Codex CLI) | `.codex/mcp_config.json` | `AGENTS.md` | Marker section |
+| **`gemini`** (Gemini CLI) | `.gemini/settings.json` | `GEMINI.md` | Marker section |
+
+---
 
 ### Step 3: Initialize & Verify Your Project Index
 
 ```bash
 cd your-project
+
+# Initialize SQLite graph index (.codegraph.sqlite3 in WAL mode)
 codegraph init
+
+# Check index freshness (<5ms via Git commit fast path)
 codegraph status
-codegraph doctor
+
+# Verify database integrity and running MCP server processes
+codegraph doctor --database
+codegraph doctor --processes
 ```
 
 > **Dynamic Index Hot-Reloading:** If your AI coding agent launches `codegraph mcp serve` before you run `codegraph init`, you do **not** need to restart your IDE or MCP session. As soon as `codegraph init` or `codegraph index` creates or updates `.codegraph.sqlite3`, the running MCP server automatically detects the database on the next tool call and refreshes its in-memory graph cache (`get_repository_status(reload=True, reindex=True)` can also be invoked directly by the agent).
+
+---
 
 ### Step 4: Run With Zero-Friction Telemetry (`codegraph run`)
 
@@ -343,6 +420,18 @@ codegraph run uvicorn main:app --reload
 
 # Django
 codegraph run python manage.py runserver
+```
+
+---
+
+### Step 5: Launch the Interactive Web Visualizer (`codegraph ui`)
+
+```bash
+# Launch interactive dashboard on http://127.0.0.1:8765
+codegraph ui
+
+# Custom port or headless server (no automatic browser launch)
+codegraph ui --port 9000 --no-browser
 ```
 
 ---
@@ -386,7 +475,7 @@ EDITING        →  Native agent / IDE editing tools
 
 ## 4. Real-World CLI Outputs
 
-Below are exact, verifiable outputs produced by CodeGraph MCP v3.0.0:
+Below are exact, verifiable outputs produced by CodeGraph MCP v3.0.1:
 
 ### 1. Zero-Friction Runtime Interceptor (`codegraph run`)
 
@@ -560,7 +649,7 @@ orders.user_id ──► users.id
 
 ## 7. Zero-Friction Runtime Intelligence & Static Reconciliation
 
-Static analysis proves what **can** happen structurally; runtime telemetry records what **was observed** during execution. CodeGraph MCP v3.0.0 brings them together transparently:
+Static analysis proves what **can** happen structurally; runtime telemetry records what **was observed** during execution. CodeGraph MCP v3.0.1 brings them together transparently:
 
 ```text
 STATIC GRAPH (AST + Framework + Dataflow + DB)
@@ -610,7 +699,7 @@ UNRESOLVED_REFERENCE / POSSIBLE_CALLS (status = "UNKNOWN" | "POSSIBLE")
 
 ## 8. Git-Aware Repository Intelligence & Merge Conflict Safety
 
-CodeGraph MCP v3.0.0 tracks the exact evolution of repository code across commits, branches, and working tree changes:
+CodeGraph MCP v3.0.1 tracks the exact evolution of repository code across commits, branches, and working tree changes:
 
 ```text
 Repository state
@@ -668,7 +757,7 @@ Automate change impact directly in your CI pipeline with `.github/workflows/code
 
 Empirically measured using [`benchmarks/run_v217_indexing_benchmark.py`](benchmarks/run_v217_indexing_benchmark.py) on macOS `arm64`, Python `3.13` with permanent SQLite WAL concurrency:
 
-| Workload Tier | Files | Symbols | Graph Edges | Baseline Total | v3.0.0 Measured | Measured Improvement | Peak RSS | Peak WAL | Final WAL |
+| Workload Tier | Files | Symbols | Graph Edges | Baseline Total | v3.0.1 Measured | Measured Improvement | Peak RSS | Peak WAL | Final WAL |
 | :--- | ---: | ---: | ---: | ---: | ---: | :--- | ---: | ---: | ---: |
 | **Small** | `54` | `115` | `398` | `0.527 s` | `0.447 s` | **15.2% faster (`1.18x`)** | `48.00 MB` | `1.701 MB` | `0.0 MB` |
 | **Medium** | `304` | `615` | `2,248` | `2.564 s` | `2.159 s` | **15.8% faster (`1.19x`)** | `69.72 MB` | `4.082 MB` | `0.0 MB` |
@@ -677,7 +766,7 @@ Empirically measured using [`benchmarks/run_v217_indexing_benchmark.py`](benchma
 
 ### Stress Tier (`2,504` Files) Phase Breakdown
 
-| Phase / Metric | Legacy Baseline | v3.0.0 Measured | Measured Improvement |
+| Phase / Metric | Legacy Baseline | v3.0.1 Measured | Measured Improvement |
 | :--- | ---: | ---: | :--- |
 | **Total Indexing Time** | `21.983 s` | `18.937 s` | **13.9% faster (`1.16x`)** |
 | **Database Intelligence Pass** | `4.818 s` | `0.893 s` | **81.5% faster (`5.40x`)** |
@@ -694,7 +783,7 @@ Empirically measured using [`benchmarks/run_v217_indexing_benchmark.py`](benchma
 
 ![CodeGraph MCP — Measured Large-Repository Scaling](docs/assets/large_repo_scaling.svg)
 
-### 50-Task Production Benchmark Results (`v3.0.0`)
+### 50-Task Production Benchmark Results (`v3.0.1`)
 
 Evaluated across 50 production tasks and 10 categories via [`benchmarks/run_v21_eval.py`](benchmarks/run_v21_eval.py):
 
@@ -831,7 +920,7 @@ codegraph install --print-config claude                    # Print MCP JSON + ru
 codegraph install --dry-run                                # Preview planned file changes
 codegraph uninstall --yes                                  # Remove CodeGraph MCP agent integrations
 
-# Git-Aware Repository Intelligence (v3.0.0)
+# Git-Aware Repository Intelligence (v3.0.1)
 codegraph git-state .                                      # Track HEAD, working tree, and freshness (CLEAN/DIRTY/STALE)
 codegraph git-diff HEAD~1 HEAD                             # Semantic AST diff across commits or branches
 codegraph git-impact --tree                                # Deep downstream change impact with visual ASCII tree
@@ -839,7 +928,7 @@ codegraph git-conflicts main HEAD                          # Detect pre-merge se
 codegraph check-freshness "audit auth flow"                # Validate if compiled context is VALID or STALE
 codegraph symbol-history resolve_target                    # Trace deterministic symbol lifecycle across commits
 
-# Zero-Friction Runtime Interceptor (v3.0.0)
+# Zero-Friction Runtime Interceptor (v3.0.1)
 codegraph run npm run dev                                  # Wrap Node/Express/Next.js dev server
 codegraph run uvicorn main:app --reload                    # Wrap FastAPI/ASGI dev server
 codegraph run python manage.py runserver                   # Wrap Django dev server
@@ -860,7 +949,7 @@ codegraph doctor --processes                               # Inspect active MCP 
 codegraph status .                                         # Show index freshness (sub-50ms Git fast path)
 codegraph doctor . --database --processes                  # Verify SQLite integrity, FKs, FTS, and memory
 codegraph privacy .                                        # Verify zero sensitive files indexed
-codegraph version                                          # Print CodeGraph MCP version (3.0.0)
+codegraph version                                          # Print CodeGraph MCP version (3.0.1)
 
 # Code, Graph, Routes & Context Interrogation
 codegraph search "authenticate" -r .                       # Search indexed symbols and text chunks

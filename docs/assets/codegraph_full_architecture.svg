@@ -27,7 +27,7 @@
   <rect class="bg" x="0" y="0" width="1100" height="620" />
 
   <!-- Top Title & Subtitle -->
-  <text class="title" x="32" y="38">🧠 CodeGraph MCP v3.0.1 — Full-Stack Architecture &amp; Intelligence Pipeline</text>
+  <text class="title" x="32" y="38">CodeGraph MCP v3.0.1 — Full-Stack Architecture &amp; Intelligence Pipeline</text>
   <text class="subtitle" x="32" y="60">Deterministic AST Evidence, 25 Production Pillars, CSR Traversal, Sub-15ms Watcher &amp; 97 Verified FastMCP Tools</text>
 
   <!-- LAYER 1: CLIENTS & AGENTS (Top bar) -->
