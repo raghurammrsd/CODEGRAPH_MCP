@@ -110,6 +110,9 @@ def parse_rust(content: str, file_path: str) -> Any:
 
     # Scope mount: web::scope("/api/v1") or .nest("/api/v1", ...)
     scope_mount_re = re.compile(r'(?:web::scope|\.nest)\s*\(\s*"([^"]+)"')
+    actix_res_re = re.compile(r'web::resource\s*\(\s*"([^"]+)"')
+    actix_res_to_re = re.compile(r'web::resource\s*\(\s*"([^"]+)"\s*\)\s*\.\s*(?:to|to_async)\s*\(\s*([a-zA-Z0-9_:]+)\s*\)')
+    actix_route_method_re = re.compile(r'\.route\s*\(\s*web::(get|post|put|delete|patch|head|options)\s*\(\s*\)\s*\.\s*(?:to|to_async)\s*\(\s*([a-zA-Z0-9_:]+)\s*\)')
 
     # Local binding: let client = Client::new();
     binding_re = re.compile(r'^\s*let\s+(?:mut\s+)?([A-Za-z0-9_]+)(?:\s*:\s*([A-Za-z0-9_&<>*]+))?\s*=\s*([A-Za-z0-9_:]+)')
@@ -119,6 +122,8 @@ def parse_rust(content: str, file_path: str) -> Any:
     active_fn_scope: tuple[str, str, int] | None = None
     pending_actix_route: tuple[str, str, int] | None = None
     imported_symbols: dict[str, str] = {}
+    current_actix_scope: str = ""
+    current_actix_resource: str = ""
 
     for idx, line in enumerate(lines):
         lineno = idx + 1
@@ -408,19 +413,98 @@ def parse_rust(content: str, file_path: str) -> Any:
                 continue
 
         # 8. Check Router Scopes / Nesting
-        m_mount = scope_mount_re.search(clean)
-        if m_mount:
-            prefix = m_mount.group(1)
+        m_scope = re.search(r'web::scope\s*\(\s*"([^"]+)"', clean)
+        if m_scope:
+            prefix = m_scope.group(1).rstrip("/")
+            current_actix_scope = prefix
+
+        m_nest = re.search(r'\.nest\s*\(\s*"([^"]+)"\s*,\s*([A-Za-z0-9_:]+)', clean)
+        if m_nest:
+            prefix = m_nest.group(1).rstrip("/")
+            child = m_nest.group(2)
             mounts.append(
                 RouterMountDetection(
-                    framework="actix-web",
+                    framework="axum",
                     parent_router="App",
-                    child_router="Scope",
+                    child_router=child,
                     prefix=prefix,
                     file_path=file_path,
                     line=lineno,
                     confidence="HIGH",
-                    evidence=f"Actix/Axum router scope prefix '{prefix}'",
+                    evidence=f"Axum router nest prefix '{prefix}' -> '{child}'",
+                )
+            )
+
+        # 8b. Check Actix programmatic DSL: web::resource("/path").to(handler) or web::resource("users").route(web::post().to_async(...))
+        m_actix_direct = re.search(r'\.route\s*\(\s*"([^"]+)"\s*,\s*web::(get|post|put|delete|patch|head)\s*\(\s*\)\s*\.\s*(?:to|to_async)\s*\(\s*([a-zA-Z0-9_:]+)\s*\)\s*\)', clean)
+        if m_actix_direct:
+            r_path = m_actix_direct.group(1)
+            h_method = m_actix_direct.group(2).upper()
+            h_name = m_actix_direct.group(3)
+            target_canon = f"rust:{imported_symbols.get(h_name, f'{crate_name}::{h_name}')}"
+            routes.append(
+                RouteDetection(
+                    framework="actix-web",
+                    http_method=h_method,
+                    route_path=r_path,
+                    normalized_route=r_path,
+                    handler_name=h_name,
+                    handler_canonical_id=target_canon,
+                    file_path=file_path,
+                    line=lineno,
+                    confidence="HIGH",
+                    evidence=f"Actix programmatic route {h_method} '{r_path}' -> {h_name}",
+                )
+            )
+
+        m_res_to = actix_res_to_re.search(clean)
+        if m_res_to:
+            r_path = m_res_to.group(1)
+            h_name = m_res_to.group(2)
+            full_route = f"{current_actix_scope}/{r_path.lstrip('/')}" if current_actix_scope and not r_path.startswith("/") else (r_path if not current_actix_scope else f"{current_actix_scope}{r_path}")
+            current_actix_resource = full_route
+            target_canon = f"rust:{imported_symbols.get(h_name, f'{crate_name}::{h_name}')}"
+            routes.append(
+                RouteDetection(
+                    framework="actix-web",
+                    http_method="GET",
+                    route_path=full_route,
+                    normalized_route=full_route,
+                    handler_name=h_name,
+                    handler_canonical_id=target_canon,
+                    file_path=file_path,
+                    line=lineno,
+                    confidence="HIGH",
+                    evidence=f"Actix resource route GET '{full_route}' -> {h_name} on line {lineno}",
+                )
+            )
+        else:
+            m_res = actix_res_re.search(clean)
+            if m_res:
+                r_path = m_res.group(1)
+                if current_actix_scope:
+                    full_route = f"{current_actix_scope}/{r_path.lstrip('/')}" if not r_path.startswith("/") else f"{current_actix_scope}{r_path}"
+                else:
+                    full_route = r_path
+                current_actix_resource = full_route
+
+        m_route = actix_route_method_re.search(clean)
+        if m_route and current_actix_resource:
+            h_method = m_route.group(1).upper()
+            h_name = m_route.group(2)
+            target_canon = f"rust:{imported_symbols.get(h_name, f'{crate_name}::{h_name}')}"
+            routes.append(
+                RouteDetection(
+                    framework="actix-web",
+                    http_method=h_method,
+                    route_path=current_actix_resource,
+                    normalized_route=current_actix_resource,
+                    handler_name=h_name,
+                    handler_canonical_id=target_canon,
+                    file_path=file_path,
+                    line=lineno,
+                    confidence="HIGH",
+                    evidence=f"Actix resource route {h_method} '{current_actix_resource}' -> {h_name} on line {lineno}",
                 )
             )
 

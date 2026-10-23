@@ -254,3 +254,42 @@ pub fn build_app() -> Router {
 
     r_post = next(r for r in res_m.routes if r.http_method == "POST")
     assert r_post.handler_canonical_id == "rust:handlers::orders::create_order"
+
+
+def test_actix_programmatic_scope_and_resource_routes() -> None:
+    code = """use actix_web::{web, HttpResponse};
+
+pub async fn index() -> &'static str { "home" }
+pub async fn register() -> HttpResponse { HttpResponse::Ok().finish() }
+pub async fn login() -> HttpResponse { HttpResponse::Ok().finish() }
+pub async fn get_article() -> HttpResponse { HttpResponse::Ok().finish() }
+
+pub fn configure_routes(cfg: &mut web::ServiceConfig) {
+    cfg.service(web::resource("/").to(index))
+       .service(web::scope("/api")
+           .service(web::resource("users")
+               .route(web::post().to_async(register))
+           )
+           .service(web::resource("users/login")
+               .route(web::post().to_async(login))
+           )
+           .service(web::resource("articles/{id}")
+               .route(web::get().to_async(get_article))
+           )
+       );
+}
+"""
+    res = parse_rust(code, "src/routes.rs")
+    routes_map = {(r.http_method, r.route_path): r.handler_name for r in res.routes}
+    assert ("GET", "/") in routes_map
+    assert routes_map[("GET", "/")] == "index"
+
+    assert ("POST", "/api/users") in routes_map
+    assert routes_map[("POST", "/api/users")] == "register"
+
+    assert ("POST", "/api/users/login") in routes_map
+    assert routes_map[("POST", "/api/users/login")] == "login"
+
+    assert ("GET", "/api/articles/{id}") in routes_map
+    assert routes_map[("GET", "/api/articles/{id}")] == "get_article"
+

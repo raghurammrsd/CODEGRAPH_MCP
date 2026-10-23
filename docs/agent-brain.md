@@ -1,8 +1,8 @@
-# CodeGraph Deep Agent Brain & Operating Manual (v3.0.1)
+# CodeGraph Deep Agent Brain & Operating Manual (v3.0.1.post1)
 
 > **Canonical Reference (`docs/agent-brain.md`)**
 > Generated deterministically from `src/codegraph/agent_capabilities.py`, `src/codegraph/evidence_contract.py`, `src/codegraph/retrieval_policy.py`, and `src/codegraph/mcp/server.py`.
-> Package: `codegraph-engine` (`v3.0.1`) | CLI: `codegraph` | MCP Command: `codegraph mcp serve`
+> Package: `codegraph-engine` (`v3.0.1.post1`) | CLI: `codegraph` | MCP Command: `codegraph mcp serve`
 
 ---
 
