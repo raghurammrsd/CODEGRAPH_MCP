@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.0.1.post1 (Actix-Web Route Hierarchy, Multi-Language Real-World Repo Verification)
+## 3.0.1 (25 Pillars, 97 Verified FastMCP Tools, Multi-Language Fixes & Windows Portability)
 
 ### Actix-Web Programmatic Route & Scope Hierarchy
 - **Fluent Actix Route Extraction**: Added complete detection of Actix-Web programmatic route hierarchies (`web::resource`, `web::scope`, `.route(web::<method>().to(...) / to_async(...))` and `web::resource(...).to(...)`), enabling 100% route coverage on real-world Actix services alongside Axum, Gin, Express, FastAPI, and Spring Boot.
@@ -11,8 +11,6 @@
 - **Zero Parse Failures**: 0 parse errors across all 268 real-world files.
 - **420/420 MCP Tools Pass Rate**: 100% successful execution across 70 representative FastMCP tools in all 6 language environments with 0 crashes.
 - **Context Reduction**: 82.7% to 94.7% token reduction across real-world context packets compared to full codebase ingestion.
-
-## 3.0.1 (25 Pillars, 97 Verified FastMCP Tools, Multi-Language Fixes & Windows Portability)
 
 ### 25-Pillar Architecture & FastMCP Tool Suite
 - **97 Verified FastMCP Tools**: 100% audit pass rate across all 97 registered FastMCP endpoints, expanding coverage across Symbol Intelligence, Call Graphs, Database Schema, Blast Radius, Context Synthesis, Multi-Agent Leases, Safe Refactoring, HTTP Routes & API Drift, Taint Security & Architectural Rules, and Index Repair.

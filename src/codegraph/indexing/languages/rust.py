@@ -109,7 +109,8 @@ def parse_rust(content: str, file_path: str) -> Any:
     actix_attr_re = re.compile(r'^\s*#\[(get|post|put|delete|patch|head)\s*\(\s*"([^"]+)"\s*\)\]')
 
     # Scope mount: web::scope("/api/v1") or .nest("/api/v1", ...)
-    scope_mount_re = re.compile(r'(?:web::scope|\.nest)\s*\(\s*"([^"]+)"')
+    scope_mount_re = re.compile(r'web::scope\s*\(\s*"([^"]+)"')
+    nest_mount_re = re.compile(r'\.nest\s*\(\s*"([^"]+)"\s*,\s*([A-Za-z0-9_:]+)')
     actix_res_re = re.compile(r'web::resource\s*\(\s*"([^"]+)"')
     actix_res_to_re = re.compile(r'web::resource\s*\(\s*"([^"]+)"\s*\)\s*\.\s*(?:to|to_async)\s*\(\s*([a-zA-Z0-9_:]+)\s*\)')
     actix_route_method_re = re.compile(r'\.route\s*\(\s*web::(get|post|put|delete|patch|head|options)\s*\(\s*\)\s*\.\s*(?:to|to_async)\s*\(\s*([a-zA-Z0-9_:]+)\s*\)')
@@ -413,12 +414,12 @@ def parse_rust(content: str, file_path: str) -> Any:
                 continue
 
         # 8. Check Router Scopes / Nesting
-        m_scope = re.search(r'web::scope\s*\(\s*"([^"]+)"', clean)
+        m_scope = scope_mount_re.search(clean)
         if m_scope:
             prefix = m_scope.group(1).rstrip("/")
             current_actix_scope = prefix
 
-        m_nest = re.search(r'\.nest\s*\(\s*"([^"]+)"\s*,\s*([A-Za-z0-9_:]+)', clean)
+        m_nest = nest_mount_re.search(clean)
         if m_nest:
             prefix = m_nest.group(1).rstrip("/")
             child = m_nest.group(2)
