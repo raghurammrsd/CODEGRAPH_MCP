@@ -20,11 +20,11 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/raghurammrsd/CODE_GRAPH_MCP"
-Repository = "https://github.com/raghurammrsd/CODE_GRAPH_MCP"
-Documentation = "https://github.com/raghurammrsd/CODE_GRAPH_MCP/blob/main/docs/agent-brain.md"
-Changelog = "https://github.com/raghurammrsd/CODE_GRAPH_MCP/blob/main/CHANGELOG.md"
-Issues = "https://github.com/raghurammrsd/CODE_GRAPH_MCP/issues"
+Homepage = "https://github.com/raghurammrsd/CODEGRAPH_MCP"
+Repository = "https://github.com/raghurammrsd/CODEGRAPH_MCP"
+Documentation = "https://github.com/raghurammrsd/CODEGRAPH_MCP/blob/main/docs/agent-brain.md"
+Changelog = "https://github.com/raghurammrsd/CODEGRAPH_MCP/blob/main/CHANGELOG.md"
+Issues = "https://github.com/raghurammrsd/CODEGRAPH_MCP/issues"
 
 [project.optional-dependencies]
 mcp = ["mcp>=1.0,<2"]

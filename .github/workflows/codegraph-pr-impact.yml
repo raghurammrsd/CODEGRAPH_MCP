@@ -57,7 +57,7 @@ jobs:
             | **Total Impacted Entities** | \`${totalImpacted}\` |
             | **Semantic Conflicts** | \`${hasConflicts === 'True' ? '⚠️ Detected' : '✅ 0 Conflicts'}\` |
             
-            > Deterministic analysis powered by [CodeGraph MCP](https://github.com/raghurammrsd/CODE_GRAPH_MCP).
+            > Deterministic analysis powered by [CodeGraph MCP](https://github.com/raghurammrsd/CODEGRAPH_MCP).
             `;
             
             github.rest.issues.createComment({

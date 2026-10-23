@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/raghurammrsd/CODE_GRAPH_MCP"><img src="https://img.shields.io/github/stars/raghurammrsd/CODE_GRAPH_MCP?style=for-the-badge&logo=github&color=gold" alt="GitHub Stars" /></a>
+  <a href="https://github.com/raghurammrsd/CODEGRAPH_MCP"><img src="https://img.shields.io/github/stars/raghurammrsd/CODEGRAPH_MCP?style=for-the-badge&logo=github&color=gold" alt="GitHub Stars" /></a>
   <a href="https://pypi.org/project/codegraph-engine/"><img src="https://img.shields.io/badge/pypi-codegraph--engine-3776AB.svg?style=for-the-badge&logo=pypi" alt="PyPI: codegraph-engine" /></a>
   <a href="src/codegraph/mcp/server.py"><img src="https://img.shields.io/badge/MCP-97%20Verified%20Tools-2ea043.svg?style=for-the-badge" alt="MCP Tools: 97 verified" /></a>
   <a href="tests/"><img src="https://img.shields.io/badge/pytest-1062%20passed%20(100%25)-brightgreen.svg?style=for-the-badge&logo=pytest" alt="Tests: 1062 passed" /></a>
@@ -21,7 +21,7 @@
 > CodeGraph MCP provides deterministic, evidence-backed repository intelligence through Abstract Syntax Trees, framework router hierarchies, database lineage, and runtime observation across 25 production pillars and 97 FastMCP tools.
 
 <p align="center">
-  <a href="https://raghurammrsd.github.io/CODE_GRAPH_MCP/"><strong>Documentation Site</strong></a> •
+  <a href="https://raghurammrsd.github.io/CODEGRAPH_MCP/"><strong>Documentation Site</strong></a> •
   <a href="https://pypi.org/project/codegraph-engine/3.0.1/"><strong>PyPI Package (v3.0.1)</strong></a> •
   <a href="#overview"><strong>Overview</strong></a> •
   <a href="#the-25-production-pillars-of-codegraph-mcp"><strong>25 Pillars</strong></a> •
@@ -35,7 +35,7 @@
   <a href="#8-git-aware-repository-intelligence"><strong>Git Intelligence</strong></a> •
   <a href="#measured-performance--real-metrics-benchmark"><strong>Benchmarks</strong></a> •
   <a href="docs/agent-brain.md"><strong>97-Tool Reference</strong></a> •
-  <a href="https://github.com/raghurammrsd/CODE_GRAPH_MCP"><strong>GitHub</strong></a>
+  <a href="https://github.com/raghurammrsd/CODEGRAPH_MCP"><strong>GitHub</strong></a>
 </p>
 
 ---
@@ -48,7 +48,7 @@ When AI coding agents (such as Claude Code, Cursor, or Antigravity) explore comp
 
 ### The Solution: CodeGraph MCP
 
-**CodeGraph MCP provides deterministic, compiler-grade repository intelligence through the Model Context Protocol.** Instead of guessing based on lexical approximations, the AI agent queries a local, persistent SQLite index for verified AST relationships, framework router trees, database lineages, and live runtime observations—resolved in sub-5ms latency.
+**CodeGraph MCP provides deterministic, evidence-backed repository intelligence through the Model Context Protocol.** Instead of guessing based on lexical approximations, the AI agent queries a local, persistent SQLite index for verified AST relationships, framework router trees, database lineages, and live runtime observations. When dynamic ambiguity occurs (such as untyped method receivers in Python or JS), relationships are explicitly tagged as `POSSIBLE` or `UNKNOWN` rather than inventing false facts.
 
 ```text
        ┌─────────────────────────────────────────────────────────────┐
@@ -79,7 +79,7 @@ When AI coding agents (such as Claude Code, Cursor, or Antigravity) explore comp
 - **Zero-Friction Dev Interception (`codegraph run`)**: Wraps local development servers (e.g., `codegraph run npm run dev`, `codegraph run uvicorn main:app`) to capture real HTTP routes, latencies, and stack traces without application code changes.
 - **Multi-Agent Setup (`codegraph install`)**: Automatically detects, configures, and verifies integrations for Claude Code, Cursor, Antigravity, and Cline.
 
-> **Supported Languages & Frameworks:** Python (`FastAPI`, `Flask`, `Django`, `SQLAlchemy`, `PyTorch`, `Celery`, `LangChain`, `LlamaIndex`, `Ray`, `pytest`), TypeScript / JavaScript (`.ts`, `.tsx`, `.js`, `.jsx`, `React`, `Next.js`, `NestJS`, `Express.js`, `Prisma`, `Drizzle`, `Mongoose`), and Roblox / Luau (`.lua`, `.luau`, `Rojo`, `Knit`, `Flamework / roblox-ts`, `DataStoreService`, `ProfileService`).
+> **Supported Languages & Frameworks:** Python (`FastAPI`, `Flask`, `Django`, `SQLAlchemy`, `PyTorch`), TypeScript / JavaScript (`React`, `Next.js`, `Express`, `NestJS`, `Prisma`), Roblox / Luau (`Rojo`, `Knit`, `DataStoreService`), Go (`Gin`, `Echo`, `net/http`), Rust (`Axum`, `Actix`, `Tokio`), Java (`Spring Boot`, `JPA`), and C/C++.
 
 <p align="center">
   <img src="docs/assets/codegraph_full_architecture.svg" alt="CodeGraph MCP Comprehensive Full-Stack Architecture Pipeline" width="950" />
@@ -99,12 +99,15 @@ Performance and retrieval accuracy are verified across two empirical evaluation 
 | **Exploration Tool Calls** | 164 total tool calls (~5.1 / task) | **71 tool calls** (~2.2 / task) | **56.7% fewer tool calls** | 32-Task Navigation Eval |
 | **Context Consumption (Prompt Tokens)** | 3,000 – 12,000+ tokens / task | **~510 tokens** avg payload | **72% – 85% token savings** | 32-Task Navigation Eval |
 | **Direct File Token Reduction** | Full file reads required | Bounded slices via `get_file` | **41.8% token reduction** | 50-Task Retrieval Benchmark |
-| **Task Coverage & Symbol Recall** | Baseline lexical match | **88.0% coverage / 61.9% recall** | **Verified ground truth** | 50-Task Retrieval Benchmark |
-| **Incremental File Reindexing (Live)** | Full rescan required (1.2s – 6.5s) | **< 15ms per file (`codegraph watch`)** | **In-memory cache patch** | Live OS Kernel Watcher |
+| **Multi-File Context Reduction** | 3,000 – 12,000+ tokens / task | **~510 tokens** avg payload | **72% – 85% token reduction** | 32-Task Navigation Eval |
+| **Task Coverage & Symbol Recall** | Baseline lexical match | **89.0% coverage / 72.5% recall** | **Verified ground truth** | 50-Task Retrieval Benchmark |
+| **In-Memory SQLite WAL Query** | Full rescan required (1.2s – 6.5s) | **< 15ms per query** | **Permanent WAL concurrency** | Persistent MCP Server Daemon |
+| **Binary CSR Pathfinding** | Linear graph scan | **< 1ms traversal** | **Microsecond CSR search** | `fast_graph_path` Traversal |
+| **CLI Cold Invocation Latency** | — | **~265ms total turnaround** | **Includes Python startup** | One-off CLI Subcommands |
 | **Single-File Full Re-index (Cold CLI)** | Full rescan required (4.4s) | **3.665s** (2,504 files) | **16.9% faster** | 4-Tier Stress Benchmark |
 | **Repository Freshness Check** | 450ms – 2,100ms disk stat checks | **< 5ms (Git commit fast path)** | **99% faster checks** | Git Fast Path Check |
 | **Symbol Grounding & Resolution** | Manual file scanning | **< 2ms in-memory SQLite** | **Sub-millisecond resolution** | SQLite Indexed Lookup |
-| **Automated Test Suite Quality** | — | **980+ passed tests (100% pass rate)** | **Zero regressions** | Pytest CI/CD Suite |
+| **Automated Test Suite Quality** | — | **1,062 passed tests (100% pass rate)** | **Zero regressions** | Pytest CI/CD Suite |
 
 <p align="center">
   <img src="docs/assets/performance_comparison.svg" alt="CodeGraph MCP — Measured Context & Exploration Efficiency" width="850" />
@@ -249,9 +252,9 @@ CodeGraph **v3.0.1** is the production-grade codebase intelligence engine for AI
 
 ---
 
-### Multi-Language Real-World Benchmark Results
+### Multi-Language Framework Benchmarks
 
-All measurements were executed against real-world production repositories using CodeGraph v3.0.1 (97 FastMCP tools, SQLite WAL storage):
+Evaluated against multi-layer framework fixtures (Gin HTTP, Axum + sqlx, Spring Boot + JPA, Express + React TSX, Rojo + DataStore) using CodeGraph v3.0.1 (97 FastMCP tools, SQLite WAL storage):
 
 | Language | Ecosystem / Framework | Indexing Time (Core AST) | SQLite DB Size | Files | Symbols | Edges | Avg Query Latency | Production Score |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -490,13 +493,13 @@ $ codegraph run python3 -c "print('>> Dev server active on port 8000')"
 ```bash
 $ codegraph status .
 {
-  "repository": "/Users/raghuram/Documents/ChatGPT/MCP",
+  "repository": "/workspace/my-project",
   "freshness": "FRESH",
   "freshness_detail": "Index matches current repository state.",
   "files": 190,
   "chunks": 1965,
   "symbols": 1947,
-  "framework_routes": 0,
+  "framework_routes": 14,
   "graph_edges": 12712,
   "resource_profile": "BALANCED",
   "pressure_level": "NORMAL",
@@ -1002,8 +1005,8 @@ codegraph mcp stop                                         # Stop active MCP pro
 ## 15. Contributing & License
 
 ```bash
-git clone https://github.com/raghurammrsd/CODE_GRAPH_MCP.git
-cd CODE_GRAPH_MCP
+git clone https://github.com/raghurammrsd/CODEGRAPH_MCP.git
+cd CODEGRAPH_MCP
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev,mcp,system]"

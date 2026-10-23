@@ -19,5 +19,5 @@ Allow: /
 User-agent: ClaudeBot
 Allow: /
 
-Sitemap: https://raghurammrsd.github.io/CODE_GRAPH_MCP/sitemap.xml
-Sitemap: https://raghurammrsd.github.io/CODE_GRAPH_MCP/sitemap.txt
+Sitemap: https://raghurammrsd.github.io/CODEGRAPH_MCP/sitemap.xml
+Sitemap: https://raghurammrsd.github.io/CODEGRAPH_MCP/sitemap.txt
