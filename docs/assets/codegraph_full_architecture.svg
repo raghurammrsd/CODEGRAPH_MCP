@@ -27,8 +27,8 @@
   <rect class="bg" x="0" y="0" width="1100" height="620" />
 
   <!-- Top Title & Subtitle -->
-  <text class="title" x="32" y="38">🧠 CodeGraph MCP — Comprehensive Full-Stack Architecture &amp; Intelligence Pipeline</text>
-  <text class="subtitle" x="32" y="60">Deterministic AST-Verified Semantics, PyTorch / AI-ML Lineage, Sub-15ms Live Watcher, Full-Stack Bridge &amp; 70 Verified MCP Tools</text>
+  <text class="title" x="32" y="38">🧠 CodeGraph MCP v3.0.1 — Full-Stack Architecture &amp; Intelligence Pipeline</text>
+  <text class="subtitle" x="32" y="60">Deterministic AST Evidence, 25 Production Pillars, CSR Traversal, Sub-15ms Watcher &amp; 97 Verified FastMCP Tools</text>
 
   <!-- LAYER 1: CLIENTS & AGENTS (Top bar) -->
   <rect class="card" x="28" y="78" width="1044" height="66" />
@@ -133,5 +133,5 @@
   <text class="code-lbl" x="848" y="464">PRAGMA synchronous = NORMAL</text>
   <text class="code-lbl" x="848" y="480">PRAGMA busy_timeout = 30000</text>
   <text class="body-text" x="838" y="508" fill="#8b949e">100% Local-First • Zero Remote Calls</text>
-  <text class="code-lbl" x="838" y="560">70 Verified MCP Tools Total</text>
+  <text class="code-lbl" x="838" y="560">97 Verified FastMCP Tools (100% Pass)</text>
 </svg>

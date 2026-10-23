@@ -26,8 +26,8 @@
 
   <rect class="bg" x="0" y="0" width="920" height="430" />
 
-  <text class="title" x="28" y="38">CodeGraph MCP — Measured Large-Repository Scaling (v2.2.1)</text>
-  <text class="subtitle" x="28" y="58">Methodology: 4-tier benchmark fixture (54 → 2,504 files, 5,015 symbols, 18,528 edges; permanent WAL + sub-50ms Git fast path)</text>
+  <text class="title" x="28" y="38">CodeGraph MCP v3.0.1 — Multi-Language &amp; Large-Repo Scaling</text>
+  <text class="subtitle" x="28" y="58">Methodology: 4-tier stress benchmark (up to 2,504 files) + 5-ecosystem multi-language benchmark (Rust, Go, Java, TS, Roblox)</text>
 
   <!-- Left Chart: Files -> Index Time (v2.1.6 vs v2.2.1) -->
   <rect class="card" x="24" y="76" width="430" height="330" />

@@ -198,125 +198,54 @@ Zero-heat, real-time file system monitoring with sub-15ms incremental reindexing
 
 ## 1. What's New in v3.0.1: 25 Production Pillars & 97 Verified FastMCP Tools
 
-Version `3.0.1` represents the definitive production release of CodeGraph MCP, bringing together **25 architectural pillars**, **97 verified FastMCP tools** (100% audit pass rate), **sub-millisecond Compressed Sparse Row (CSR) binary traversal**, and **deep multi-language intelligence** across Python, TypeScript/JavaScript, Roblox/Luau, Go, Rust, Java, and C/C++.
+CodeGraph **v3.0.1** is the production-grade codebase intelligence engine for AI coding agents, providing deterministic, source-verified AST facts, microsecond Compressed Sparse Row (CSR) graph pathfinding, and sub-15ms live file synchronization across 7 major programming languages.
 
-```mermaid
-flowchart TD
-    subgraph ClientLayer["AI Coding Agents & Editors"]
-        Agent["Claude Code / Cursor / Antigravity / Cline"]
-        VSCode["VS Code Extension / CodeLens"]
-        WebUI["Web UI Dashboard (127.0.0.1:8765)"]
-    end
+<p align="center">
+  <img src="docs/assets/codegraph_full_architecture.svg" alt="CodeGraph v3.0.1 Architecture Pipeline" width="100%" />
+</p>
 
-    subgraph ProtocolLayer["Protocol & Interception Layer"]
-        FastMCP["FastMCP Server (97 Tools, stdio & SSE)"]
-        LSP["LSP JSON-RPC Bridge (:codegraph lsp)"]
-        DevInterceptor["Runtime Interceptor (codegraph run)"]
-        OTLP["OTLP HTTP Trace Receiver (:4318)"]
-    end
+### Key Feature Highlights
 
-    subgraph CoreEngine["CodeGraph v3.0.1 Engine Core (25 Pillars)"]
-        CSR["Compressed Sparse Row (CSR) Graph"]
-        AST["Multi-Language AST Scanner (7 Languages)"]
-        DI["Dependency Injection & Route Composer"]
-        DB["Database Lineage & ORM Schema Engine"]
-        Impact["PR Blast Radius & Impact Analyzer"]
-        Patch["Semantic Patch & Safe Refactoring"]
-        Security["Interprocedural Taint & CVE Engine"]
-        MultiAgent["Agent Memory (FTS5) & File Lease Locks"]
-    end
-
-    subgraph StorageLayer["Deterministic Storage (Zero-Vector, Sub-5ms)"]
-        SQLite[".codegraph.sqlite3 (WAL Mode, Normalized Schema)"]
-        MemoryDB[".codegraph/memory.sqlite3 (Agent Experience FTS5)"]
-        RuntimeDB[".codegraph/runtime.sqlite3 (Live Traces)"]
-    end
-
-    Agent -->|JSON-RPC Tools| FastMCP
-    VSCode -->|stdio LSP| LSP
-    WebUI -->|REST / SSE| FastMCP
-    FastMCP --> CSR
-    FastMCP --> AST
-    FastMCP --> DI
-    FastMCP --> DB
-    FastMCP --> Impact
-    FastMCP --> Patch
-    FastMCP --> Security
-    FastMCP --> MultiAgent
-    DevInterceptor --> RuntimeDB
-    OTLP --> RuntimeDB
-    CoreEngine --> SQLite
-    MultiAgent --> MemoryDB
-```
+- ⚡ **Microsecond CSR Traversal**: Traverses call chains and impact graphs across 100k+ edges in microseconds via binary Compressed Sparse Row matrices (`graph_csr.py`).
+- 🧠 **97 Verified FastMCP Tools**: 100% audit pass rate across all registered FastMCP tools for Claude Code, Cursor, Antigravity, and Cline.
+- 📉 **65% to 85% Token Reduction**: Returns compact, bounded AST context packets (~510 tokens) rather than dumping entire multi-thousand-line files.
+- 🌐 **7 Languages Native Support**: Python, TypeScript/JavaScript, Roblox/Luau, Go, Rust, Java, and C/C++.
+- 🛡️ **Zero Hallucinated Edges**: Every caller, route, and database relationship is compiler-verified (`AST_VERIFIED` / `FRAMEWORK_VERIFIED`).
+- 🪟 **Universal Cross-Platform**: Native Windows `kernel32` process inspection, cp1252/UTF-8 terminal safety, and `python -m codegraph` execution out of the box.
+- 🔄 **Sub-15ms Live Watcher**: Instant OS kernel push synchronization (macOS FSEvents, Linux inotify, Windows ReadDirectoryChangesW).
+- 🎮 **Roblox & Luau Intelligence**: Client-server remote hopping, Rojo file tree mapping, and DataStore persistence lineage.
 
 ---
 
 ### The 25 Production Pillars of CodeGraph MCP
 
-CodeGraph is organized into 25 purpose-built architectural pillars designed to eliminate hallucinations, prevent broken contracts, and optimize LLM context:
-
-```mermaid
-flowchart LR
-    subgraph Intelligence["Static & Dynamic Intelligence"]
-        P1["1. Multi-Lang AST"]
-        P2["2. CSR Binary Graph"]
-        P3["3. 97 FastMCP Tools"]
-        P4["4. HTTP & RPC Routes"]
-        P5["5. API Contract Drift"]
-        P6["6. Dependency Injection"]
-        P7["7. Database Lineage"]
-        P8["8. Blast Radius Impact"]
-        P9["9. Live Watcher"]
-    end
-    subgraph Safety["Safety & Refactoring"]
-        P10["10. Safe Refactoring"]
-        P11["11. Agent Leases"]
-        P12["12. Dead Code Reachability"]
-        P13["13. Taint Security"]
-        P14["14. CVE Supply Chain"]
-        P15["15. Repo Federation"]
-        P16["16. Test Scaffolding"]
-        P17["17. LSP Bridge"]
-    end
-    subgraph Operations["Lifecycle & Operations"]
-        P18["18. Agent Memory"]
-        P19["19. Git Diff Freshness"]
-        P20["20. Self-Healing Index"]
-        P21["21. SWE-bench Sandbox"]
-        P22["22. PR Review Bot"]
-        P23["23. Web UI Dashboard"]
-        P24["24. Windows Portability"]
-        P25["25. Universal Installer"]
-    end
-```
-
-| # | Pillar Name | Primary MCP Tools | Key Capabilities & Architecture |
+| Category | Pillar | Primary Tools | What It Does |
 |---|---|---|---|
-| **1** | **Multi-Language AST Engine** | `resolve_symbol`, `get_symbol`, `batch_get_symbols` | Native Tree-Sitter & Python AST parsers for 7 languages (Python, TS/JS, Roblox/Luau, Go, Rust, Java, C/C++). Sub-60ms parse speed. |
-| **2** | **CSR Binary Graph Traversal** | `fast_graph_path`, `get_call_graph` | Compressed Sparse Row (`graph_csr.py`) in-memory binary format enabling microsecond BFS/DFS pathfinding across 100,000+ edges. |
-| **3** | **97-Tool FastMCP Registry** | 97 registered FastMCP endpoints | 100% verified tool suite spanning symbols, callers, routes, databases, tests, git diffs, refactoring, security, and agent memory. |
-| **4** | **Cross-Layer Route & RPC Discovery** | `find_routes`, `list_routes` | Detects route mounts and verb-handlers across FastAPI, Flask, Django, Express, Spring Boot, Gin, Axum, and Roblox client-server Remotes. |
-| **5** | **Full-Stack API Contract Drift** | `check_api_drift` | Statically correlates frontend `fetch()` / `axios` endpoints with backend handlers. Detects broken routes, 404s, and drift before deployment. |
-| **6** | **Dependency Injection Graph** | `get_context`, `resolve_symbol` | Resolves FastAPI `Depends(...)`, Spring `@Autowired`, Angular providers, and Gin middleware chains to exact provider symbols. |
-| **7** | **Database Schema & ORM Lineage** | `find_db_tables`, `find_db_writers`, `get_db_impact` | Mapped SQLAlchemy, Prisma, Django ORM, JPA, and Roblox DataStore persistence directly to code writers and readers. |
-| **8** | **PR Blast Radius & Impact Analysis** | `analyze_change_impact`, `get_change_impact` | Computes downstream caller trees, affected routes, and covering tests before changes are merged. |
-| **9** | **Incremental Live Watcher** | `codegraph watch` | OS kernel push events (macOS FSEvents, Linux inotify, Windows ReadDirectoryChangesW) debouncing re-indexes in sub-15ms. |
-| **10** | **AST-Safe Refactoring & Semantic Patching** | `safe_rename`, `apply_semantic_patch` | Multi-file transactional patches with AST syntax validation, dry-run diff preview, and one-command rollback manifest. |
-| **11** | **Multi-Agent Lease Coordination** | `claim_file_lease`, `release_file_lease` | Concurrency protection for parallel agent swarms. Grants TTL-bounded file locks and prevents overwrite collisions. |
-| **12** | **Dead Code & Reachability Analysis** | `find_unreachable_code`, `find_dead_code` | Graph reachability traversal from HTTP routes, CLI commands, and DI roots to surface unused functions and zombie tables. |
-| **13** | **Interprocedural Taint & Security** | `analyze_dataflow_taint` | Multi-hop source-to-sink dataflow tracking detecting SQL injection, unvalidated user input, and insecure deserialization. |
-| **14** | **Supply Chain Vulnerability (CVE)** | `analyze_supply_chain_cve_impact` | Scans package manifests and lockfiles, mapping known CVE vulnerabilities to direct internal consumers. |
-| **15** | **Cross-Repository Workspace Federation** | `federate_repositories`, `find_cross_repo_routes` | Connects microservice repositories into a unified graph, resolving cross-repo RPC and HTTP API relationships. |
-| **16** | **Automated Test Scaffolding** | `generate_test_scaffolding` | Synthesizes runnable unit tests (`pytest`, `Jest`, `TestEZ`) with auto-mocked database sessions and parameter fixtures. |
-| **17** | **LSP Bridge & VS Code CodeLens** | `codegraph lsp` | Standard JSON-RPC language server exposing definition, references, symbols, and live caller-count CodeLens to editors. |
-| **18** | **Agent Experience & Trajectory Memory** | `store_agent_memory`, `query_agent_memory` | SQLite FTS5 store saving past debugging steps, symptoms, and verified fixes with sub-5ms BM25 retrieval. |
-| **19** | **Git-Aware Freshness & Structural Diffing** | `get_git_state`, `compare_git` | Monotonic Git commit verification, semantic function diffs, and context invalidation checks. |
-| **20** | **Self-Healing Index Repair** | `repair_repository_index` | Automatic integrity checks, SQLite schema migration, orphaned entity garbage collection, and WAL rebuild. |
-| **21** | **SWE-bench Sandbox Harness** | `evaluate_speculative_patch` | Isolated test execution harness evaluating agent patches against benchmark test suites. |
-| **22** | **Native PR Review Bot** | `generate_pr_review` | Generates rich Markdown review comments highlighting contract breaks, modified endpoints, and test coverage gaps. |
-| **23** | **Interactive Web Dashboard** | `codegraph ui` | Local browser visualizer (`127.0.0.1:8765`) rendering interactive Cytoscape graphs, routes, and database lineage. |
-| **24** | **Cross-Platform Native Portability** | `codegraph` CLI | Zero-dependency Windows cp1252/Win32 kernel32 process inspection, macOS Darwin, and Linux support. |
-| **25** | **Universal Agent Onboarding Installer** | `codegraph install` | Auto-configures Claude Code, Cursor, Antigravity, Cline, Codex CLI, and Gemini CLI with safety backups. |
+| **Code Intelligence** | **1. Multi-Language AST** | `resolve_symbol`, `batch_get_symbols` | Native AST extraction for 7 languages in <60ms. |
+| | **2. CSR Binary Graph** | `fast_graph_path`, `get_call_graph` | Microsecond pathfinding across binary CSR matrices. |
+| | **3. 97 FastMCP Tools** | 97 registered FastMCP endpoints | 100% verified tool suite spanning all capabilities. |
+| | **4. HTTP & RPC Routes** | `find_routes`, `list_routes` | FastAPI, Express, Spring Boot, Gin, Axum, Roblox Remotes. |
+| | **5. API Contract Drift** | `check_api_drift` | Statically matches frontend `fetch()` to backend routes. |
+| | **6. Dependency Injection** | `get_context`, `resolve_symbol` | Traces FastAPI `Depends`, Spring `@Autowired`, Gin middleware. |
+| | **7. Database Lineage** | `find_db_tables`, `get_db_impact` | Mapped SQLAlchemy, Prisma, JPA, SQLx, DataStore writers. |
+| **Safety & Testing** | **8. PR Blast Radius** | `analyze_change_impact`, `get_change_impact` | Downstream caller trees, impacted routes, and tests. |
+| | **9. Live Watcher** | `codegraph watch` | Kernel push events debounced in <15ms. |
+| | **10. Safe Refactoring** | `safe_rename`, `apply_semantic_patch` | Multi-file transactional patches with rollback safety. |
+| | **11. Multi-Agent Leases** | `claim_file_lease`, `release_file_lease` | Concurrency locks preventing swarm file collisions. |
+| | **12. Dead Code Detection** | `find_unreachable_code`, `find_dead_code` | Graph reachability traversal finding unused symbols. |
+| | **13. Taint Security** | `analyze_dataflow_taint` | Interprocedural dataflow tracking for injection flaws. |
+| | **14. Supply Chain CVE** | `analyze_supply_chain_cve_impact` | Maps package lockfile CVEs to internal code consumers. |
+| | **15. Repo Federation** | `federate_repositories` | Cross-repository HTTP and RPC service resolution. |
+| | **16. Test Scaffolding** | `generate_test_scaffolding` | Auto-generates unit test suites with mocked DB fixtures. |
+| | **17. LSP Bridge** | `codegraph lsp` | stdio LSP server with definition and caller CodeLens. |
+| **Operations & Storage** | **18. Agent Memory** | `store_agent_memory`, `query_agent_memory` | SQLite FTS5 experience store with sub-5ms BM25 search. |
+| | **19. Git Diff Freshness** | `get_git_state`, `compare_git` | Monotonic Git commit diffs & context invalidation. |
+| | **20. Index Self-Healing** | `repair_repository_index` | Automatic integrity checks and WAL rebuilds. |
+| | **21. SWE-bench Sandbox** | `evaluate_speculative_patch` | Isolated test execution harness for agent patches. |
+| | **22. PR Review Bot** | `generate_pr_review` | High-density PR review comments with risk badges. |
+| | **23. Web UI Dashboard** | `codegraph ui` | Browser visualizer on `127.0.0.1:8765`. |
+| | **24. Windows Portability** | `codegraph` CLI | Native Windows encoding, Win32 kernel32, and `python -m codegraph`. |
+| | **25. Universal Installer** | `codegraph install` | Auto-onboarding for Claude, Cursor, Antigravity, Cline. |
 
 ---
 
