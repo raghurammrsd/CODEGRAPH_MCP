@@ -1,8 +1,8 @@
-# CodeGraph Deep Agent Brain & Operating Manual (v3.0.0)
+# CodeGraph Deep Agent Brain & Operating Manual (v3.0.1)
 
 > **Canonical Reference (`docs/agent-brain.md`)**
 > Generated deterministically from `src/codegraph/agent_capabilities.py`, `src/codegraph/evidence_contract.py`, `src/codegraph/retrieval_policy.py`, and `src/codegraph/mcp/server.py`.
-> Package: `codegraph-engine` (`v3.0.0`) | CLI: `codegraph` | MCP Command: `codegraph mcp serve`
+> Package: `codegraph-engine` (`v3.0.1`) | CLI: `codegraph` | MCP Command: `codegraph mcp serve`
 
 ---
 
@@ -1337,7 +1337,7 @@ CodeGraph supports six deterministic tool profiles (`codegraph mcp serve --profi
 | `graph` | `17` | Tracing, change-impact, test discovery, and architecture sessions | `analyze_impact`, `find_related_tests`, `get_architecture`, `get_call_graph`, `get_callees`, `get_callers`, `get_context`, `get_dependents`, `get_file`, `get_git_impact`, `get_imports`, `get_references`, `get_symbol`, `list_routes`, `resolve_symbol`, `search_symbols`, `trace_path` |
 | `minimal` | `21` | Context-heavy coding sessions needing core interrogation plus get_context and read_file | `compile_task`, `find_symbol`, `get_architecture`, `get_callees`, `get_callers`, `get_context`, `get_dependents`, `get_file`, `get_git_impact`, `get_imports`, `get_references`, `get_repository_status`, `get_resource_status`, `get_symbol`, `list_routes`, `read_file`, `resolve_symbol`, `search_code`, `search_symbols`, `trace_path`, `verify_evidence` |
 | `developer` | `34` | Full interactive development with impact analysis, test linking, and git history | `analyze_change_impact`, `analyze_impact`, `compile_task`, `find_callees`, `find_callers`, `find_references`, `find_related_tests`, `find_symbol`, `get_architecture`, `get_call_graph`, `get_callees`, `get_callers`, `get_context`, `get_dependents`, `get_evidence`, `get_file`, `get_file_history`, `get_git_impact`, `get_graph`, `get_imports`, `get_recent_changes`, `get_references`, `get_repository_status`, `get_resource_status`, `get_symbol`, `list_routes`, `plan_retrieval`, `read_file`, `resolve_symbol`, `search_code`, `search_symbols`, `trace_call`, `trace_path`, `verify_evidence` |
-| `full` | `76` | Complete diagnostic, database intelligence, runtime reconciliation, benchmark, and repository administration sessions | `analyze_change_impact`, `analyze_impact`, `apply_semantic_patch`, `batch_find_callers`, `batch_get_context`, `batch_get_symbols`, `check_api_drift`, `check_context_freshness`, `check_db_drift`, `check_route_schema_drift`, `compare_git`, `compile_task`, `detect_semantic_conflicts`, `find_callees`, `find_callers`, `find_db_callers`, `find_db_columns`, `find_db_models`, `find_db_queries`, `find_db_readers`, `find_db_relationships`, `find_db_tables`, `find_db_writers`, `find_dead_code`, `find_references`, `find_related_tests`, `find_routes`, `find_symbol`, `find_tests`, `get_architecture`, `get_call_graph`, `get_callees`, `get_callers`, `get_change_impact`, `get_context`, `get_db_impact`, `get_db_schema`, `get_db_table`, `get_dependencies`, `get_dependency_graph`, `get_dependents`, `get_distributed_trace`, `get_evidence`, `get_file`, `get_file_history`, `get_file_symbols`, `get_git_impact`, `get_git_state`, `get_graph`, `get_imports`, `get_live_services`, `get_monorepo_packages`, `get_project_structure`, `get_recent_changes`, `get_references`, `get_repository_status`, `get_resource_status`, `get_runtime_trace`, `get_symbol`, `ingest_runtime_traces`, `list_routes`, `plan_retrieval`, `preview_semantic_patch`, `read_file`, `reconcile_static_runtime`, `resolve_symbol`, `rollback_refactor`, `safe_rename`, `search_code`, `search_memory`, `search_symbols`, `trace_call`, `trace_flow`, `trace_path`, `trace_symbol_history`, `verify_evidence` |
+| `full` | `97` | Complete diagnostic, database intelligence, runtime reconciliation, benchmark, and repository administration sessions | `analyze_change_impact`, `analyze_dataflow_taint`, `analyze_impact`, `analyze_supply_chain_cve_impact`, `apply_semantic_patch`, `batch_find_callers`, `batch_get_context`, `batch_get_symbols`, `check_api_drift`, `check_context_freshness`, `check_db_drift`, `check_route_schema_drift`, `claim_file_lease`, `compare_git`, `compile_task`, `detect_semantic_conflicts`, `evaluate_speculative_patch`, `fast_graph_path`, `federate_repositories`, `find_callees`, `find_callers`, `find_cross_repo_routes`, `find_db_callers`, `find_db_columns`, `find_db_models`, `find_db_queries`, `find_db_readers`, `find_db_relationships`, `find_db_tables`, `find_db_writers`, `find_dead_code`, `find_references`, `find_related_tests`, `find_routes`, `find_symbol`, `find_tests`, `find_unreachable_code`, `generate_pr_review`, `generate_semantic_changelog`, `generate_test_scaffolding`, `get_architecture`, `get_call_graph`, `get_callees`, `get_callers`, `get_change_impact`, `get_context`, `get_db_impact`, `get_db_schema`, `get_db_table`, `get_dependencies`, `get_dependency_graph`, `get_dependents`, `get_distributed_trace`, `get_evidence`, `get_file`, `get_file_history`, `get_file_symbols`, `get_git_impact`, `get_git_state`, `get_graph`, `get_imports`, `get_live_services`, `get_lsp_diagnostics`, `get_monorepo_packages`, `get_multi_agent_status`, `get_project_structure`, `get_recent_changes`, `get_references`, `get_repository_status`, `get_resource_status`, `get_runtime_trace`, `get_symbol`, `ingest_runtime_traces`, `list_routes`, `plan_retrieval`, `preview_semantic_patch`, `propagate_interprocedural_dataflow`, `query_agent_memory`, `read_file`, `reconcile_static_runtime`, `register_agent_session`, `release_file_lease`, `repair_repository_index`, `resolve_polymorphic_callees`, `resolve_symbol`, `rollback_refactor`, `safe_rename`, `search_code`, `search_memory`, `search_symbols`, `store_agent_memory`, `trace_call`, `trace_flow`, `trace_path`, `trace_symbol_history`, `verify_architectural_rules`, `verify_evidence` |
 
 ---
 
@@ -1730,7 +1730,7 @@ Every tool chain has an explicit **STOP condition**:
 
 ---
 
-## 41. Complete Tool Reference (All 76 Exposed MCP Tools)
+## 41. Complete Tool Reference (All 97 Exposed MCP Tools)
 
 ### `analyze_change_impact`
 
@@ -1785,6 +1785,60 @@ find_related_tests or read_file
 - **Call**: `analyze_change_impact(since="HEAD~2", until="HEAD")`
 - **Interpretation**: Inspect modified_symbols, downstream callers, and related_tests.
 
+### `analyze_dataflow_taint`
+
+- **Capability**: `security_taint_audit`
+- **Profiles**: `full`
+- **Task Categories**: `DEBUG`, `EXPLANATION`
+
+#### Purpose
+Analyze source-to-sink dataflow taint paths for injection and security vulnerabilities (SQL injection CWE-89, command execution CWE-78, path traversal CWE-22, SSRF CWE-918, insecure deserialization CWE-502) using AST dataflow tracking. Use when auditing endpoint security, sanitization gaps, or vulnerable data sinks. Does not execute repository code; reports AST-verified taint propagation chains.
+
+#### Use when
+- Auditing user-input flows into raw SQL queries, shell commands, file opens, or HTTP requests
+- Checking whether sanitization functions neutralize tainted data before sink execution
+
+#### Avoid when
+- Fixing pure syntax errors or non-security refactoring tasks
+
+#### Required inputs
+None
+
+#### Optional inputs
+`entrypoint_symbol`, `filter_cwe`, `max_depth`
+
+#### Minimal invocation
+```python
+analyze_dataflow_taint()
+```
+
+#### Advanced invocation
+```python
+analyze_dataflow_taint(filter_cwe="CWE-89", max_depth=10)
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `repository`, `total_vulnerabilities`, `critical_count`, `high_count`, `vulnerabilities`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Deterministic AST source-to-sink variable propagation and sink validation.
+
+#### Non-guarantees
+Does not prove runtime exploitability when external WAF or runtime middleware blocks traffic.
+
+#### Typical follow-up
+inspect vulnerabilities list and remediate unsanitized sinks
+
+#### Common mistakes
+- Assuming absence of taint findings proves total exploit immunity without defense-in-depth review
+
+#### Example
+- **Developer request**: "Are there any SQL injection or command injection vulnerabilities in our route handlers?"
+- **Call**: `analyze_dataflow_taint(filter_cwe="CWE-89")`
+- **Interpretation**: Inspect vulnerabilities for source expression, sink function, and remediation advice.
+
 ### `analyze_impact`
 
 - **Capability**: `symbol_blast_radius`
@@ -1837,6 +1891,60 @@ find_related_tests or read_file on direct_callers
 - **Developer request**: "What breaks if we change DatabasePool.acquire?"
 - **Call**: `analyze_impact(symbol="DatabasePool.acquire", max_depth=3)`
 - **Interpretation**: Review direct_callers, transitive_callers, affected_routes, and related_tests.
+
+### `analyze_supply_chain_cve_impact`
+
+- **Capability**: `supply_chain_analysis`
+- **Profiles**: `full`
+- **Task Categories**: `PACKAGE`, `CHANGE_IMPACT`
+
+#### Purpose
+Inspect third-party dependency manifests (package.json, go.mod, Cargo.toml, requirements.txt) and trace actual internal call site reachability. Use when assessing CVE vulnerability blast radius. Does not execute external dependencies.
+
+#### Use when
+- Determining if a flagged vulnerable third-party package is actually imported by your code
+- Auditing all internal call sites invoking a specific external library
+
+#### Avoid when
+- Searching internal workspace symbols
+
+#### Required inputs
+None
+
+#### Optional inputs
+`target_package`
+
+#### Minimal invocation
+```python
+analyze_supply_chain_cve_impact()
+```
+
+#### Advanced invocation
+```python
+analyze_supply_chain_cve_impact(target_package="axios")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `workspace`, `total_dependencies`, `actively_imported_count`, `packages`, `active_call_sites`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Manifest parsing and import call-site reachability matching.
+
+#### Non-guarantees
+Does not fetch live CVE databases without external network connectivity.
+
+#### Typical follow-up
+inspect active_call_sites for impacted files
+
+#### Common mistakes
+- Assuming package is safe just because it is in devDependencies
+
+#### Example
+- **Developer request**: "Is package lodash actively imported and called in our codebase?"
+- **Call**: `analyze_supply_chain_cve_impact(target_package="lodash")`
+- **Interpretation**: Check is_actively_imported and call_sites_count.
 
 ### `apply_semantic_patch`
 
@@ -2269,6 +2377,60 @@ get_route_db_lineage or get_db_table
 - **Call**: `check_route_schema_drift(route="/api/v1/orders/checkout")`
 - **Interpretation**: Review issues for MISSING_REQUIRED_COLUMN or NULLABILITY_MISMATCH.
 
+### `claim_file_lease`
+
+- **Capability**: `multi_agent_lease`
+- **Profiles**: `full`
+- **Task Categories**: `LOCAL_EDIT`, `DEBUG`
+
+#### Purpose
+Claim a lease lock on a file path to prevent concurrent edit clobbering by other AI agents. Use before modifying a file in a multi-agent environment. Does not modify file content.
+
+#### Use when
+- Locking a core module before applying automated refactoring patches
+- Ensuring no teammate agent overwrites a file during multi-file editing
+
+#### Avoid when
+- Read-only queries or symbol discovery
+
+#### Required inputs
+`agent_id`, `file_path`
+
+#### Optional inputs
+`lease_type`, `ttl_seconds`
+
+#### Minimal invocation
+```python
+claim_file_lease(agent_id="agent-1", file_path="src/main.py")
+```
+
+#### Advanced invocation
+```python
+claim_file_lease(agent_id="agent-1", file_path="src/main.py", lease_type="EXCLUSIVE_WRITE", ttl_seconds=120)
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `success`, `message`, `file_path`, `agent_id`, `lease_type`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Atomic mutex lock preventing overlapping write leases.
+
+#### Non-guarantees
+Does not prevent manual human edits via external text editors.
+
+#### Typical follow-up
+apply edits, then release_file_lease
+
+#### Common mistakes
+- Holding leases indefinitely without renewing TTL or releasing upon task completion
+
+#### Example
+- **Developer request**: "Claim exclusive write lease on src/auth.py before refactoring."
+- **Call**: `claim_file_lease(agent_id="agent-1", file_path="src/auth.py")`
+- **Interpretation**: Check success is True before editing file.
+
 ### `compare_git`
 
 - **Capability**: `structural_git_diff`
@@ -2429,6 +2591,168 @@ get_file or get_symbol on conflicted symbols
 - **Call**: `detect_semantic_conflicts(base_branch="main", head_branch="HEAD")`
 - **Interpretation**: Inspect has_conflicts and conflicts list for DELETED_SYMBOL_REFERENCED or CALL_SIGNATURE_MISMATCH.
 
+### `evaluate_speculative_patch`
+
+- **Capability**: `speculative_sandbox`
+- **Profiles**: `full`
+- **Task Categories**: `LOCAL_EDIT`, `CHANGE_IMPACT`
+
+#### Purpose
+Project an in-memory virtual AST branch in RAM to evaluate caller breakages, parameter mismatches, and route mutations without modifying disk files. Use before writing refactoring patches. Does not modify disk files.
+
+#### Use when
+- Testing candidate function signature edits before committing to disk
+- Evaluating whether a proposed refactor removes required parameters
+
+#### Avoid when
+- Simple single-file docstring edits
+
+#### Required inputs
+`patches`
+
+#### Optional inputs
+None
+
+#### Minimal invocation
+```python
+evaluate_speculative_patch(patches={"src/main.py": "def foo(): pass"})
+```
+
+#### Advanced invocation
+```python
+evaluate_speculative_patch(patches={"src/api.py": "def handle(req): pass"})
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `is_safe`, `modified_files`, `contract_breaks`, `route_mutations`, `diff_summary`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+In-memory AST parsing and virtual diff contract break detection.
+
+#### Non-guarantees
+Does not execute code or run test assertions.
+
+#### Typical follow-up
+apply patch if is_safe is True or fix contract_breaks
+
+#### Common mistakes
+- Applying invalid syntax in patch content
+
+#### Example
+- **Developer request**: "Will modifying this function signature break any callers?"
+- **Call**: `evaluate_speculative_patch(patches={"src/auth.py": "def login(user): return True"})`
+- **Interpretation**: Inspect is_safe and contract_breaks list.
+
+### `fast_graph_path`
+
+- **Capability**: `compressed_graph_path`
+- **Profiles**: `full`
+- **Task Categories**: `TRACE`, `RELATIONSHIP`
+
+#### Purpose
+Compute microsecond BFS shortest path between two symbols using the Compressed Sparse Row (CSR) binary graph. Use for instant path tracing between caller and callee. Does not modify graph.
+
+#### Use when
+- Finding shortest invocation path between an entrypoint route and a database writer
+- Tracing dependency chains across microservices or packages
+
+#### Avoid when
+- When node names are unknown (use find_symbol first)
+
+#### Required inputs
+`start_node`, `end_node`
+
+#### Optional inputs
+None
+
+#### Minimal invocation
+```python
+fast_graph_path(start_node="api_login", end_node="UserTable")
+```
+
+#### Advanced invocation
+```python
+fast_graph_path(start_node="api_login", end_node="UserTable")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `start_node`, `end_node`, `path`, `length`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Microsecond breadth-first search path traversal in C-contiguous memory.
+
+#### Non-guarantees
+Does not guarantee runtime dataflow execution along static edges.
+
+#### Typical follow-up
+inspect path array of intermediate symbols
+
+#### Common mistakes
+- Passing non-existent node names
+
+#### Example
+- **Developer request**: "What is the shortest path between handle_checkout and process_payment?"
+- **Call**: `fast_graph_path(start_node="handle_checkout", end_node="process_payment")`
+- **Interpretation**: Inspect path array for step-by-step caller-callee sequence.
+
+### `federate_repositories`
+
+- **Capability**: `monorepo_analysis`
+- **Profiles**: `full`
+- **Task Categories**: `ARCHITECTURE`, `PACKAGE`
+
+#### Purpose
+Discover and catalog federated repositories in a multi-repo workspace. Use when mapping microservice boundaries and cross-service index sizes. Does not modify child repository indices or re-index dirty working trees automatically.
+
+#### Use when
+- Mapping all microservices within a multi-repo developer workspace
+- Inspecting symbol and route counts across federated service repositories
+
+#### Avoid when
+- Analyzing a single isolated repository without sibling microservices
+
+#### Required inputs
+None
+
+#### Optional inputs
+`workspace_root`
+
+#### Minimal invocation
+```python
+federate_repositories()
+```
+
+#### Advanced invocation
+```python
+federate_repositories(workspace_root="/path/to/workspace")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `workspace_root`, `repos`, `total_repos`, `total_links`
+- **Relationships Emitted**: `CONTAINS_PACKAGE`
+
+#### Evidence meaning
+Deterministic inspection of workspace manifests (codegraph.workspace.json) and child repository SQLite indices.
+
+#### Non-guarantees
+Does not modify child repository indices or re-index dirty working trees automatically.
+
+#### Typical follow-up
+find_cross_repo_routes to map inter-service HTTP links
+
+#### Common mistakes
+- Passing a workspace root that does not contain indexed CodeGraph repositories
+
+#### Example
+- **Developer request**: "List all microservices and repository indices in this workspace."
+- **Call**: `federate_repositories()`
+- **Interpretation**: Inspect repos list containing name, path, symbol_count, and route_count.
+
 ### `find_callees`
 
 - **Capability**: `direct_callee_query`
@@ -2534,6 +2858,60 @@ get_file or trace_path
 - **Developer request**: "Who calls place_order?"
 - **Call**: `find_callers(symbol="place_order", max_results=20)`
 - **Interpretation**: Inspect each caller's source symbol, file, line, and evidence_class.
+
+### `find_cross_repo_routes`
+
+- **Capability**: `route_tracing`
+- **Profiles**: `full`
+- **Task Categories**: `ROUTE_DISCOVERY`, `ARCHITECTURE`
+
+#### Purpose
+Resolve cross-repository HTTP and RPC service-to-service links across microservices. Use when tracing requests across separate repositories. Does not prove unobserved dynamic endpoints without static route or URL evidence.
+
+#### Use when
+- Tracing an API call in a frontend service to the corresponding backend microservice handler
+- Auditing service-to-service communication topologies across a federated workspace
+
+#### Avoid when
+- Searching for routes within a single standalone repository (use find_routes instead)
+
+#### Required inputs
+None
+
+#### Optional inputs
+`workspace_root`, `query`
+
+#### Minimal invocation
+```python
+find_cross_repo_routes()
+```
+
+#### Advanced invocation
+```python
+find_cross_repo_routes(query="/api/v1/users")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `workspace_root`, `total_links`, `cross_repo_links`
+- **Relationships Emitted**: `FETCHES_ROUTE`, `ROUTES_TO`
+
+#### Evidence meaning
+Deterministic cross-repository URL pattern matching against indexed framework_routes tables.
+
+#### Non-guarantees
+Does not prove unobserved dynamic endpoints without static route or URL evidence.
+
+#### Typical follow-up
+trace_path or get_file on target_repo and target_file
+
+#### Common mistakes
+- Querying unindexed sibling repositories
+
+#### Example
+- **Developer request**: "Find which microservice handles the /api/v1/users endpoint called by frontend."
+- **Call**: `find_cross_repo_routes(query="/api/v1/users")`
+- **Interpretation**: Inspect cross_repo_links for source_repo, target_repo, and target_handler.
 
 ### `find_db_callers`
 
@@ -3281,6 +3659,224 @@ get_file on the test function if test assertions need inspection
 - **Developer request**: "What tests cover parse_bill?"
 - **Call**: `find_tests(symbol="parse_bill")`
 - **Interpretation**: Inspect each returned test symbol, its file path, and the linking relationship (e.g., TESTS_SYMBOL, TESTS_ROUTE).
+
+### `find_unreachable_code`
+
+- **Capability**: `reachability_analysis`
+- **Profiles**: `full`
+- **Task Categories**: `DIAGNOSTIC`, `ARCHITECTURE`
+
+#### Purpose
+Perform DI-aware root-to-leaf reachability analysis from HTTP routes, CLIs, and crons to detect true dead code with STATIC_VERIFIED confidence. Use when pruning dead code or unused legacy modules. Does not delete code.
+
+#### Use when
+- Identifying unused functions, orphaned classes, and abandoned legacy endpoints
+- Validating codebase tree-shaking opportunities before major refactors
+
+#### Avoid when
+- Working on library packages intended for external consumer import
+
+#### Required inputs
+None
+
+#### Optional inputs
+None
+
+#### Minimal invocation
+```python
+find_unreachable_code()
+```
+
+#### Advanced invocation
+```python
+find_unreachable_code()
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `workspace`, `total_symbols`, `reachable_count`, `unreachable_count`, `dead_code_percentage`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+BFS reachability traversal over calls, inheritance, and DI bindings.
+
+#### Non-guarantees
+Does not prove unreachability for code invoked via external dynamic reflection or eval.
+
+#### Typical follow-up
+inspect unreachable_symbols list for candidates to delete
+
+#### Common mistakes
+- Deleting public library exports that are called only by external downstream consumers
+
+#### Example
+- **Developer request**: "Are there any completely dead or unreachable functions in our project?"
+- **Call**: `find_unreachable_code()`
+- **Interpretation**: Inspect unreachable_symbols list with STATIC_VERIFIED confidence.
+
+### `generate_pr_review`
+
+- **Capability**: `pr_review`
+- **Profiles**: `full`
+- **Task Categories**: `CHANGE_IMPACT`, `DIAGNOSTIC`
+
+#### Purpose
+Generate comprehensive semantic PR review evaluating structural diffs, caller contract breaks, affected routes, and test gaps. Use when reviewing pull requests or evaluating branch changes before merging. Does not execute repository code or guarantee merge builds pass without running tests.
+
+#### Use when
+- Auditing PR branches for breaking API changes and deleted symbols before merge
+- Generating automated Markdown review comments for GitHub Actions PRs
+- Checking whether modified HTTP endpoints have covering test cases
+
+#### Avoid when
+- Checking uncommitted local working-tree edits without git commit refs
+
+#### Required inputs
+None
+
+#### Optional inputs
+`base_ref`, `head_ref`
+
+#### Minimal invocation
+```python
+generate_pr_review()
+```
+
+#### Advanced invocation
+```python
+generate_pr_review(base_ref="origin/main", head_ref="HEAD")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `base_ref`, `head_ref`, `verdict`, `summary`, `findings`, `files_changed`, `affected_routes`, `affected_tests`, `suggested_test_command`, `markdown_report`
+- **Relationships Emitted**: `CALLS`, `REFERENCES`
+
+#### Evidence meaning
+Deterministic 3-way AST merge-base comparison, semantic contract verification, and test coverage gap detection.
+
+#### Non-guarantees
+Does not execute repository code or guarantee merge builds pass without running tests.
+
+#### Typical follow-up
+inspect findings list or run suggested_test_command
+
+#### Common mistakes
+- Passing invalid git revision names
+
+#### Example
+- **Developer request**: "Review this pull request against main and flag any breaking contract changes."
+- **Call**: `generate_pr_review(base_ref="main", head_ref="HEAD")`
+- **Interpretation**: Inspect verdict ('APPROVE', 'COMMENT', 'REQUEST_CHANGES') and markdown_report.
+
+### `generate_semantic_changelog`
+
+- **Capability**: `semantic_changelog`
+- **Profiles**: `full`
+- **Task Categories**: `CHANGE_IMPACT`, `ARCHITECTURE`
+
+#### Purpose
+Synthesize human-readable release changelog categorizing breaking changes, new endpoints, and database mutations from AST diffs. Use when writing release notes or preparing deployment summaries. Does not modify git repository.
+
+#### Use when
+- Summarizing release highlights between two Git release tags
+- Listing breaking changes before deploying an API version
+
+#### Avoid when
+- Querying single file syntax
+
+#### Required inputs
+None
+
+#### Optional inputs
+`base_ref`, `head_ref`
+
+#### Minimal invocation
+```python
+generate_semantic_changelog()
+```
+
+#### Advanced invocation
+```python
+generate_semantic_changelog(base_ref="v1.0.0", head_ref="v2.0.0")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `base_ref`, `head_ref`, `total_changes`, `breaking_changes_count`, `markdown_changelog`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+AST-diff categorization of added/removed routes, schema mutations, and API drops.
+
+#### Non-guarantees
+Does not document non-code changes such as asset or documentation edits.
+
+#### Typical follow-up
+review markdown_changelog output
+
+#### Common mistakes
+- Using invalid or non-existent Git commit hashes
+
+#### Example
+- **Developer request**: "Generate a release changelog comparing HEAD~5 to HEAD."
+- **Call**: `generate_semantic_changelog(base_ref="HEAD~5", head_ref="HEAD")`
+- **Interpretation**: Inspect markdown_changelog for breaking changes and new endpoints.
+
+### `generate_test_scaffolding`
+
+- **Capability**: `test_generation`
+- **Profiles**: `full`
+- **Task Categories**: `TEST_DISCOVERY`, `DEBUG`
+
+#### Purpose
+Generate production-ready test scaffolding with fixtures, dependency mocks (DB sessions, HTTP clients), and boundary test cases for a symbol or route. Use when writing tests for untested functions or HTTP endpoints. Does not execute generated tests or prove test assertions pass without execution.
+
+#### Use when
+- Generating test scaffolding for newly added functions or methods
+- Creating integration test templates for FastAPI, Express, or Actix HTTP routes
+- Detecting mock requirements (database sessions, external APIs) from call graphs
+
+#### Avoid when
+- Searching for existing test files (use find_tests instead)
+
+#### Required inputs
+`target`
+
+#### Optional inputs
+`framework`
+
+#### Minimal invocation
+```python
+generate_test_scaffolding(target="process_payment")
+```
+
+#### Advanced invocation
+```python
+generate_test_scaffolding(target="process_payment", framework="pytest")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `target_symbol`, `target_file`, `framework`, `suggested_test_file`, `test_code`, `mock_requirements`, `test_cases`
+- **Relationships Emitted**: `TESTS`, `TESTS_SYMBOL`
+
+#### Evidence meaning
+Deterministic callee inspection, database dependency tracking, and framework signature analysis.
+
+#### Non-guarantees
+Does not execute generated tests or prove test assertions pass without execution.
+
+#### Typical follow-up
+write_file to save the generated test_code into suggested_test_file
+
+#### Common mistakes
+- Expecting generated mock assertions to contain proprietary business logic without user customization
+
+#### Example
+- **Developer request**: "Generate a pytest test suite for process_payment with database mocks."
+- **Call**: `generate_test_scaffolding(target="process_payment")`
+- **Interpretation**: Inspect test_code and mock_requirements, then write to suggested_test_file.
 
 ### `get_architecture`
 
@@ -4456,6 +5052,60 @@ get_distributed_trace or list_routes
 - **Call**: `get_live_services()`
 - **Interpretation**: Inspect live_services for active listening ports and PIDs.
 
+### `get_lsp_diagnostics`
+
+- **Capability**: `compiler_diagnostics`
+- **Profiles**: `full`
+- **Task Categories**: `DEBUG`, `DIAGNOSTIC`
+
+#### Purpose
+Collect live compiler diagnostics, type errors, and lint warnings via Language Server Protocol (LSP) daemons (pyright, gopls, rust-analyzer, clangd). Use when diagnosing compile errors, missing types, or verifying code correctness across languages. Does not modify source files; reports language-server diagnostics.
+
+#### Use when
+- Checking whether recent code edits introduced syntax or type check errors
+- Verifying import validity before creating a pull request
+
+#### Avoid when
+- Searching codebase symbols or tracing caller hierarchies
+
+#### Required inputs
+None
+
+#### Optional inputs
+`file_path`
+
+#### Minimal invocation
+```python
+get_lsp_diagnostics()
+```
+
+#### Advanced invocation
+```python
+get_lsp_diagnostics(file_path="src/main.py")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `workspace`, `status`, `total_diagnostics`, `error_count`, `warning_count`, `diagnostics`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Compiler-accurate type checker error ranges and diagnostic severities.
+
+#### Non-guarantees
+Does not prove runtime correctness in untyped or dynamic script sections.
+
+#### Typical follow-up
+inspect diagnostics list and fix compiler errors
+
+#### Common mistakes
+- Assuming failure if host does not have LSP binary installed (falls back gracefully to static analysis)
+
+#### Example
+- **Developer request**: "Are there any compiler or type errors in our modified files?"
+- **Call**: `get_lsp_diagnostics(file_path="src/service.py")`
+- **Interpretation**: Inspect error_count and diagnostics items for line numbers and error codes.
+
 ### `get_monorepo_packages`
 
 - **Capability**: `monorepo_package_discovery`
@@ -4509,6 +5159,60 @@ get_architecture or get_dependencies
 - **Developer request**: "List all packages in this monorepo and their dependencies."
 - **Call**: `get_monorepo_packages()`
 - **Interpretation**: Inspect packages mapping to understand package names, root paths, and dependencies.
+
+### `get_multi_agent_status`
+
+- **Capability**: `multi_agent_status`
+- **Profiles**: `full`
+- **Task Categories**: `ARCHITECTURE`, `DEBUG`
+
+#### Purpose
+Return consolidated multi-agent status report including active agent sessions, held file leases, and predicted AST conflicts. Use to check if other agents are working on related files. Does not acquire locks.
+
+#### Use when
+- Checking who is currently working on what in a multi-agent coding workspace
+- Proactively detecting if two agents are modifying caller/callee coupled files
+
+#### Avoid when
+- Routine single-agent local edits
+
+#### Required inputs
+None
+
+#### Optional inputs
+None
+
+#### Minimal invocation
+```python
+get_multi_agent_status()
+```
+
+#### Advanced invocation
+```python
+get_multi_agent_status()
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `workspace`, `total_agents`, `active_leases_count`, `conflicts_count`, `agents`, `leases`, `conflicts`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Real-time SQLite inspection of active leases and AST conflict analysis.
+
+#### Non-guarantees
+Does not predict future unannounced edits from unregistered agents.
+
+#### Typical follow-up
+review conflicts list and negotiate lease order
+
+#### Common mistakes
+- Ignoring reported semantic conflicts when planning cross-module refactors
+
+#### Example
+- **Developer request**: "What agents are currently active and are there any file lock conflicts?"
+- **Call**: `get_multi_agent_status()`
+- **Interpretation**: Inspect conflicts list to ensure zero conflicting write leases.
 
 ### `get_project_structure`
 
@@ -5098,6 +5802,114 @@ apply_semantic_patch if preview diffs and syntax validation are satisfactory
 - **Call**: `preview_semantic_patch(patches=[{"path": "app.py", "hunks": [{"target": "old()", "replacement": "new()"}]}])`
 - **Interpretation**: Verify status=='READY' and inspect diffs to ensure edits are exact.
 
+### `propagate_interprocedural_dataflow`
+
+- **Capability**: `interprocedural_dataflow`
+- **Profiles**: `full`
+- **Task Categories**: `DEBUG`, `DIAGNOSTIC`
+
+#### Purpose
+Trace inter-procedural dataflow, return type inference, and unguarded None/null dereferences across caller-callee boundaries. Use when investigating NullPointerExceptions or type contract violations. Does not execute code.
+
+#### Use when
+- Checking if a function returning Optional[T] causes AttributeError in downstream callers
+- Verifying type propagation across caller boundaries
+
+#### Avoid when
+- Simple single-expression local variable edits
+
+#### Required inputs
+`target_symbol`
+
+#### Optional inputs
+None
+
+#### Minimal invocation
+```python
+propagate_interprocedural_dataflow(target_symbol="find_user")
+```
+
+#### Advanced invocation
+```python
+propagate_interprocedural_dataflow(target_symbol="find_user")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `target_symbol`, `inferred_return_type`, `is_nullable`, `nullability_warnings`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Inter-procedural signature analysis and caller dereference checking.
+
+#### Non-guarantees
+Does not prove runtime null dereference if runtime input guarantees non-null.
+
+#### Typical follow-up
+add null guards in reported caller locations
+
+#### Common mistakes
+- Ignoring reported is_nullable warnings in high-traffic endpoints
+
+#### Example
+- **Developer request**: "Does find_user return None and could it crash its callers?"
+- **Call**: `propagate_interprocedural_dataflow(target_symbol="find_user")`
+- **Interpretation**: Inspect is_nullable and nullability_warnings list.
+
+### `query_agent_memory`
+
+- **Capability**: `agent_memory`
+- **Profiles**: `full`
+- **Task Categories**: `DEBUG`, `EXPLANATION`
+
+#### Purpose
+Search past agent debugging memories and architectural decisions using FTS5 BM25 ranking. Use when investigating recurring bugs or checking past resolutions. Does not guarantee past solutions apply to unrelated bugs without semantic match.
+
+#### Use when
+- Checking if similar error traces or symptoms have been solved in past sessions
+- Recalling previous architectural guidelines or database migration patterns
+
+#### Avoid when
+- Searching codebase symbols (use find_symbol instead) or literal code (use search_code instead)
+
+#### Required inputs
+`query`
+
+#### Optional inputs
+`category`, `limit`, `max_tokens`
+
+#### Minimal invocation
+```python
+query_agent_memory(query="auth token expired")
+```
+
+#### Advanced invocation
+```python
+query_agent_memory(query="sqlite locked", category="ARCHITECTURE_DECISION", limit=5)
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `query`, `count`, `memories`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Deterministic FTS5 BM25 relevance ranking and recency scoring.
+
+#### Non-guarantees
+Does not guarantee past solutions apply to unrelated bugs without semantic match.
+
+#### Typical follow-up
+inspect memories list for symptoms and resolution
+
+#### Common mistakes
+- Querying empty string without query terms
+
+#### Example
+- **Developer request**: "Have we ever solved a 401 token expiry error in this project?"
+- **Call**: `query_agent_memory(query="401 token expiry")`
+- **Interpretation**: Inspect memories for past resolutions and root causes.
+
 ### `read_file`
 
 - **Capability**: `targeted_source_read`
@@ -5204,6 +6016,222 @@ get_file on runtime_only_observed or static_runtime_conflicts locations
 - **Developer request**: "Where does the runtime behavior of /api/scan-bill differ from static analysis?"
 - **Call**: `reconcile_static_runtime(route="/api/scan-bill")`
 - **Interpretation**: Inspect confirmed_runtime_paths, static_runtime_conflicts, not_observed_at_runtime, and runtime_only_observed.
+
+### `register_agent_session`
+
+- **Capability**: `multi_agent_session`
+- **Profiles**: `full`
+- **Task Categories**: `ARCHITECTURE`, `DEBUG`
+
+#### Purpose
+Register an active AI coding agent session in the multi-agent shared workspace. Use when joining a swarm or announcing an active coding task to coordinate with other agents. Does not acquire file locks.
+
+#### Use when
+- Announcing an agent's active task to peer agents in a shared repository
+- Establishing agent presence before requesting file leases
+
+#### Avoid when
+- Single-agent isolated development without peer agents
+
+#### Required inputs
+`agent_id`, `name`, `task`
+
+#### Optional inputs
+None
+
+#### Minimal invocation
+```python
+register_agent_session(agent_id="agent-1", name="BugFixer", task="Fix 401")
+```
+
+#### Advanced invocation
+```python
+register_agent_session(agent_id="agent-1", name="BugFixer", task="Fix 401 error")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `agent_id`, `name`, `task_description`, `registered_at`, `status`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Atomic registration in SQLite WAL workspace registry.
+
+#### Non-guarantees
+Does not lock files or prevent uncoordinated file system modifications outside CodeGraph.
+
+#### Typical follow-up
+claim_file_lease on target files before editing
+
+#### Common mistakes
+- Using empty agent_id or failing to send heartbeats
+
+#### Example
+- **Developer request**: "Register our agent session to coordinate with other agents on this repo."
+- **Call**: `register_agent_session(agent_id="claude-1", name="RefactorBot", task="Refactor auth")`
+- **Interpretation**: Verify status == 'ACTIVE' and proceed to lease claiming.
+
+### `release_file_lease`
+
+- **Capability**: `multi_agent_lease_release`
+- **Profiles**: `full`
+- **Task Categories**: `LOCAL_EDIT`, `DEBUG`
+
+#### Purpose
+Release one or all file leases held by an AI agent upon completing task edits. Use after committing or discarding file edits. Does not delete source files.
+
+#### Use when
+- Releasing file locks so waiting agents can proceed with edits
+- Cleaning up leases when an agent finishes its assigned task
+
+#### Avoid when
+- When the agent is still modifying the target file
+
+#### Required inputs
+`agent_id`
+
+#### Optional inputs
+`file_path`
+
+#### Minimal invocation
+```python
+release_file_lease(agent_id="agent-1")
+```
+
+#### Advanced invocation
+```python
+release_file_lease(agent_id="agent-1", file_path="src/main.py")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `released_count`, `agent_id`, `file_path`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Atomic lease release and lock clearance in SQLite registry.
+
+#### Non-guarantees
+Does not commit file changes to git.
+
+#### Typical follow-up
+get_multi_agent_status to confirm clean workspace
+
+#### Common mistakes
+- Releasing leases before saving file contents to disk
+
+#### Example
+- **Developer request**: "Release all leases held by agent-1."
+- **Call**: `release_file_lease(agent_id="agent-1")`
+- **Interpretation**: Verify released_count >= 1.
+
+### `repair_repository_index`
+
+- **Capability**: `index_self_healing`
+- **Profiles**: `full`
+- **Task Categories**: `DEBUG`
+
+#### Purpose
+Perform automated self-healing, SQLite integrity verification, rebuilding corrupted FTS5 indices, pruning dangling FK references, clearing stale locks, and truncating WAL logs. Use when the repository index encounters lock contention, corrupted FTS entries, or orphaned edges. Does not delete source repository code.
+
+#### Use when
+- Recovering from unexpected process termination, stale lock files, or SQLite disk I/O errors
+- Rebuilding full-text search tables when search queries return inconsistent results
+
+#### Avoid when
+- Standard code navigation or routine symbol queries
+
+#### Required inputs
+None
+
+#### Optional inputs
+`deep`, `vacuum`
+
+#### Minimal invocation
+```python
+repair_repository_index()
+```
+
+#### Advanced invocation
+```python
+repair_repository_index(deep=True, vacuum=True)
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `status`, `integrity_check_passed`, `fts_rebuilt`, `wal_checkpointed`, `stale_locks_cleared`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+PRAGMA integrity_check validation and atomic SQLite WAL log truncation.
+
+#### Non-guarantees
+Does not restore deleted source files from outside the repository index.
+
+#### Typical follow-up
+re-run failed query or verify healthy index status
+
+#### Common mistakes
+- Calling vacuum=True on massive repositories inside high-concurrency read loops
+
+#### Example
+- **Developer request**: "The index feels out of sync and search is slow. Can we repair and optimize it?"
+- **Call**: `repair_repository_index(deep=True, vacuum=True)`
+- **Interpretation**: Check status == 'HEALTHY' or 'REPAIRED' and review actions_taken.
+
+### `resolve_polymorphic_callees`
+
+- **Capability**: `polymorphic_dispatch`
+- **Profiles**: `full`
+- **Task Categories**: `RELATIONSHIP`, `TRACE`
+
+#### Purpose
+Resolve an abstract interface method or trait invocation to all concrete implementing classes in the workspace. Use when tracing dynamic dispatch or trait method implementations. Does not execute code.
+
+#### Use when
+- Finding which concrete classes implement an interface like PaymentProcessor.charge()
+- Tracing Rust trait methods or Go interface dispatch to concrete structs
+
+#### Avoid when
+- Calling standard non-virtual concrete methods
+
+#### Required inputs
+`interface_symbol`, `method_name`
+
+#### Optional inputs
+None
+
+#### Minimal invocation
+```python
+resolve_polymorphic_callees(interface_symbol="PaymentGateway", method_name="pay")
+```
+
+#### Advanced invocation
+```python
+resolve_polymorphic_callees(interface_symbol="PaymentGateway", method_name="pay")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `interface_symbol`, `method_name`, `total_implementations`, `implementations`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+AST-verified inheritance and interface implementation matching.
+
+#### Non-guarantees
+Does not determine runtime active branch when multiple implementers exist.
+
+#### Typical follow-up
+inspect implementations list for implementing classes
+
+#### Common mistakes
+- Searching for concrete class instead of interface symbol
+
+#### Example
+- **Developer request**: "Which classes implement IOrderRepository.findById?"
+- **Call**: `resolve_polymorphic_callees(interface_symbol="IOrderRepository", method_name="findById")`
+- **Interpretation**: Review implementations list for concrete class names and file locations.
 
 ### `resolve_symbol`
 
@@ -5532,6 +6560,61 @@ resolve_symbol or get_context
 - **Call**: `search_symbols(query="verify_password", top_k=10)`
 - **Interpretation**: Select the matching symbol definition and pass its symbol or canonical_id to get_callers or get_context.
 
+### `store_agent_memory`
+
+- **Capability**: `agent_memory`
+- **Profiles**: `full`
+- **Task Categories**: `DEBUG`, `EXPLANATION`
+
+#### Purpose
+Store an agent debugging trajectory, test repair pattern, or architectural decision into persistent memory. Use when recording successful bug resolutions or architecture decisions for future recall. Does not share stored memory outside the local repository index.
+
+#### Use when
+- Saving the root cause and fix for a tricky edge-case bug for future agents
+- Recording architectural decisions and component conventions
+- Documenting flaky test workarounds and setup prerequisites
+
+#### Avoid when
+- Temporary scratchpad notes that should not persist across sessions
+
+#### Required inputs
+`title`, `resolution`
+
+#### Optional inputs
+`category`, `symptoms`, `root_cause`
+
+#### Minimal invocation
+```python
+store_agent_memory(title="Fixed Auth Skew", resolution="Added clock leeway")
+```
+
+#### Advanced invocation
+```python
+store_agent_memory(title="Fixed Auth Skew", resolution="Added clock leeway", category="BUG_FIX", symptoms="401 error", root_cause="clock drift")
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `id`, `created_at`, `session_id`, `category`, `title`, `symptoms`, `root_cause`, `resolution`, `files`, `tags`, `outcome`, `score`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Atomic persistence into SQLite and FTS5 full-text index with WAL mode concurrency.
+
+#### Non-guarantees
+Does not share stored memory outside the local repository index.
+
+#### Typical follow-up
+query_agent_memory to recall stored memory
+
+#### Common mistakes
+- Storing sensitive tokens, secrets, or passwords in memory title or resolution
+
+#### Example
+- **Developer request**: "Save this debugging resolution to agent memory."
+- **Call**: `store_agent_memory(title="Fixed token leak", resolution="Closed session in finally block")`
+- **Interpretation**: Verify id is returned starting with 'mem_'.
+
 ### `trace_call`
 
 - **Capability**: `directional_call_traversal`
@@ -5744,6 +6827,60 @@ get_symbol or get_file on historical commit
 - **Developer request**: "Trace the history and renames of AuthService across git commits."
 - **Call**: `trace_symbol_history(symbol="AuthService")`
 - **Interpretation**: Inspect events list for INTRODUCED, MODIFIED, MOVED, or RENAMED occurrences.
+
+### `verify_architectural_rules`
+
+- **Capability**: `architecture_governance`
+- **Profiles**: `full`
+- **Task Categories**: `ARCHITECTURE`, `DIAGNOSTIC`
+
+#### Purpose
+Evaluate declarative architectural boundaries, forbidden cross-module dependencies, and layer rules against the repository index. Use when checking pull request compliance with enterprise architecture. Does not modify code.
+
+#### Use when
+- Enforcing clean architecture separation between controllers and database models
+- Preventing circular or forbidden module dependency leaks
+
+#### Avoid when
+- Localized bug fixes in existing isolated functions
+
+#### Required inputs
+None
+
+#### Optional inputs
+`rules`
+
+#### Minimal invocation
+```python
+verify_architectural_rules()
+```
+
+#### Advanced invocation
+```python
+verify_architectural_rules(rules=[{'name': 'no-db-in-api', 'source_pattern': '*api*', 'cannot_import': ['*db*']}])
+```
+
+#### Result interpretation
+- **Output Type**: `dict[str, Any]`
+- **Key Fields**: `status`, `total_rules_checked`, `violations_count`, `violations`
+- **Relationships Emitted**: None (non-edge output)
+
+#### Evidence meaning
+Deterministic import edge matching against declarative glob patterns.
+
+#### Non-guarantees
+Does not infer architectural intent outside configured rule patterns.
+
+#### Typical follow-up
+remediate reported rule violations
+
+#### Common mistakes
+- Assuming compliance if rule patterns do not match source directory layout
+
+#### Example
+- **Developer request**: "Does our code violate any architectural layer boundaries?"
+- **Call**: `verify_architectural_rules()`
+- **Interpretation**: Check status == 'COMPLIANT' and inspect violations list.
 
 ### `verify_evidence`
 

@@ -315,6 +315,13 @@ def compose_routes(
             continue
 
         base_prefix, _, _ = base_prefixes.get((f_path, r_name), ("", "", 0))
+        if not base_prefix and r_name.lower() in ("router", "routes") and any(r.framework == "express" for r in node_routes):
+            # Infer prefix from file path e.g. "backend/routes/orders.ts" -> "/api/orders"
+            norm_fp = f_path.replace("\\", "/")
+            if "/routes/" in norm_fp or norm_fp.startswith("routes/"):
+                stem = Path(norm_fp).stem
+                if stem not in ("index", "router", "routes") and not any(stem in rt.route_path for rt in node_routes):
+                    base_prefix = f"/api/{stem}"
         for rt in node_routes:
             if base_prefix:
                 composed_path = join_route_prefixes(base_prefix, rt.route_path)

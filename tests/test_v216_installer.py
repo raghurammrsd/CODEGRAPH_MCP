@@ -440,7 +440,7 @@ def test_11_cli_json_and_print_config_modes(tmp_path: Path) -> None:
     inst_data = json.loads(res_inst.stdout)
     assert inst_data["status"] == "ok"
     assert inst_data["verification"]["passed"] is True
-    assert inst_data["verification"]["tool_count"] == 76
+    assert inst_data["verification"]["tool_count"] == 97
 
 
 # ---------------------------------------------------------------------------
@@ -578,7 +578,11 @@ def test_15_path_traversal_sensitive_file_and_symlink_protection(tmp_path: Path)
     outside.write_text("{}", encoding="utf-8")
     try:
         sym_file = tmp_path / ".mcp.json"
-        sym_file.symlink_to(outside)
+        try:
+            sym_file.symlink_to(outside)
+        except OSError:
+            # On Windows without developer mode or admin, symlinks are not permitted
+            return
         with pytest.raises(SecurityError):
             _ensure_safe_target_path(tmp_path, ".mcp.json")
     finally:

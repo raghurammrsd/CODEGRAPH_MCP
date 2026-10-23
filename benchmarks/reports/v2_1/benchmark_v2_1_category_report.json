@@ -2,63 +2,63 @@
   "category_summary": {
     "UNDERSTAND": {
       "fn_count": 1,
-      "fp_count": 52,
+      "fp_count": 54,
       "violations": 0
     },
     "DEBUG": {
-      "fn_count": 1,
-      "fp_count": 71,
+      "fn_count": 0,
+      "fp_count": 86,
       "violations": 0
     },
     "TRACE": {
       "fn_count": 1,
-      "fp_count": 69,
+      "fp_count": 86,
       "violations": 0
     },
     "CHANGE": {
       "fn_count": 1,
-      "fp_count": 67,
+      "fp_count": 73,
       "violations": 0
     },
     "IMPACT": {
       "fn_count": 2,
-      "fp_count": 51,
+      "fp_count": 50,
       "violations": 0
     },
     "REVIEW": {
-      "fn_count": 6,
+      "fn_count": 5,
       "fp_count": 25,
       "violations": 0
     },
     "REFACTOR": {
       "fn_count": 2,
-      "fp_count": 62,
+      "fp_count": 70,
       "violations": 0
     },
     "TEST": {
-      "fn_count": 5,
-      "fp_count": 38,
+      "fn_count": 0,
+      "fp_count": 57,
       "violations": 0
     },
     "ARCHITECTURE": {
-      "fn_count": 3,
-      "fp_count": 48,
+      "fn_count": 1,
+      "fp_count": 60,
       "violations": 0
     },
     "EXPLAIN": {
       "fn_count": 0,
-      "fp_count": 58,
+      "fp_count": 60,
       "violations": 0
     }
   },
   "fn_totals": {
-    "TARGET_RESOLUTION": 47
+    "TARGET_RESOLUTION": 33
   },
   "fp_totals": {
-    "FRAMEWORK_NOISE": 83,
-    "GRAPH_POLLUTION": 75,
-    "DUPLICATE_SYMBOL": 34,
-    "LEXICAL_NOISE": 270,
-    "TEST_NOISE": 113
+    "FRAMEWORK_NOISE": 93,
+    "GRAPH_POLLUTION": 80,
+    "DUPLICATE_SYMBOL": 48,
+    "LEXICAL_NOISE": 343,
+    "TEST_NOISE": 105
   }
 }

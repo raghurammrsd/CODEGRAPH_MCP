@@ -16,6 +16,7 @@ import json
 import posixpath
 import re
 from dataclasses import asdict, dataclass
+from typing import cast
 
 from codegraph.frameworks import (
     AnalysisContext,
@@ -221,6 +222,24 @@ def parse(content: str, language: str, file_path: str) -> ParseResult:
     if language == "luau" or file_path.lower().endswith((".lua", ".luau")):
         from codegraph.roblox import parse_luau
         return parse_luau(content, file_path)
+    if language == "go" or file_path.lower().endswith(".go"):
+        from codegraph.indexing.languages.go import parse_go
+        return cast(ParseResult, parse_go(content, file_path))
+    if language == "rust" or file_path.lower().endswith(".rs"):
+        from codegraph.indexing.languages.rust import parse_rust
+        return cast(ParseResult, parse_rust(content, file_path))
+    if language in ("java", "kotlin") or file_path.lower().endswith((".java", ".kt", ".kts")):
+        from codegraph.indexing.languages.jvm import parse_jvm
+        return cast(ParseResult, parse_jvm(content, file_path))
+    if language in ("c", "cpp", "c_header", "cpp_header") or file_path.lower().endswith((".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hxx")):
+        from codegraph.indexing.languages.cpp import parse_cpp
+        return cast(ParseResult, parse_cpp(content, file_path))
+    if language == "proto" or file_path.lower().endswith(".proto"):
+        from codegraph.indexing.protocols import parse_proto
+        return cast(ParseResult, parse_proto(content, file_path))
+    if language == "graphql" or file_path.lower().endswith((".graphql", ".gql")):
+        from codegraph.indexing.protocols import parse_graphql
+        return cast(ParseResult, parse_graphql(content, file_path))
     if language == "html" or file_path.lower().endswith((".html", ".htm", ".jinja", ".jinja2", ".njk", ".ejs")):
         from codegraph.indexing.templates import parse_html_template
         return parse_html_template(content, file_path)
@@ -3045,7 +3064,7 @@ def _parse_js_ts(content: str, language: str, file_path: str) -> ParseResult:
                             )
 
         # Route detection hook per line (Express and Next.js)
-        detected_routes = analyze_js_ts_line(line, lineno, file_path, module, import_mods_set)
+        detected_routes = analyze_js_ts_line(line, lineno, file_path, module, import_mods_set, lines, idx)
         if detected_routes:
             routes.extend(detected_routes)
         detected_mounts = analyze_js_ts_mounts(line, lineno, file_path, module)

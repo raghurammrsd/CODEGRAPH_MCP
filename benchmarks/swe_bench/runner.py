@@ -13,7 +13,7 @@ from .models import SWEBenchTask
 
 
 def get_sample_swe_bench_tasks() -> list[SWEBenchTask]:
-    """Sample realistic bug-resolution tasks modeled after SWE-bench Lite."""
+    """Sample realistic bug-resolution tasks modeled after SWE-bench Lite across multiple languages."""
     return [
         SWEBenchTask(
             instance_id="django__django-11099",
@@ -22,6 +22,7 @@ def get_sample_swe_bench_tasks() -> list[SWEBenchTask]:
             target_symbol="ASCIIUsernameValidator",
             golden_files=("django/contrib/auth/validators.py",),
             golden_lines=(17, 24),
+            language="python",
             hints="Regex pattern should match with \\A and \\Z instead of ^ and $",
         ),
         SWEBenchTask(
@@ -31,16 +32,38 @@ def get_sample_swe_bench_tasks() -> list[SWEBenchTask]:
             target_symbol="Response.iter_content",
             golden_files=("requests/models.py",),
             golden_lines=(680, 720),
+            language="python",
             hints="socket.error should be wrapped in StreamConsumedError or ConnectionError",
         ),
         SWEBenchTask(
-            instance_id="pallets__flask-4045",
-            repository_name="flask",
-            problem_statement="Blueprint with dots in name raises ValueError when mounting",
-            target_symbol="Blueprint.__init__",
-            golden_files=("src/flask/blueprints.py",),
-            golden_lines=(160, 190),
-            hints="Blueprint names containing dots cause collision in nested routing trees",
+            instance_id="gin-gonic__gin-2840",
+            repository_name="gin",
+            problem_statement="Engine router group mount does not compose prefix correctly with trailing slash",
+            target_symbol="RouterGroup.Group",
+            golden_files=("routergroup.go",),
+            golden_lines=(70, 95),
+            language="go",
+            hints="Clean path join logic before mounting sub-router",
+        ),
+        SWEBenchTask(
+            instance_id="tokio-rs__axum-1492",
+            repository_name="axum",
+            problem_statement="Nested router path extraction fails on wildcard patterns",
+            target_symbol="Router::nest",
+            golden_files=("src/routing/mod.rs",),
+            golden_lines=(120, 150),
+            language="rust",
+            hints="Strip wildcard prefix before delegating to inner match tree",
+        ),
+        SWEBenchTask(
+            instance_id="spring-projects__spring-boot-3102",
+            repository_name="spring-boot",
+            problem_statement="RequestMapping handler fails URI variable resolution with nested path brackets",
+            target_symbol="RequestMappingHandlerMapping",
+            golden_files=("src/main/java/org/springframework/boot/web/servlet/FilterRegistrationBean.java",),
+            golden_lines=(45, 80),
+            language="java",
+            hints="Escape URI template curly braces in path matcher",
         ),
     ]
 

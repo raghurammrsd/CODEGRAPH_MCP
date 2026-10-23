@@ -1374,6 +1374,31 @@ def _get_context_impl(
                     )
         timing.tests_ms = (time.perf_counter() - t_tests_start) * 1000
 
+        # Fallback seeding: if candidate_dicts is empty, seed with top symbols from index
+        if not candidate_dicts:
+            try:
+                fb_rows = con.execute("""
+                    SELECT name, canonical_id, kind, path, start_line, end_line
+                    FROM symbols
+                    WHERE kind IN ('class', 'struct', 'interface', 'function', 'method')
+                    ORDER BY start_line
+                    LIMIT 20;
+                """).fetchall()
+                for r in fb_rows:
+                    candidate_dicts.append({
+                        "file": r[3],
+                        "symbol": r[0],
+                        "canonical_id": r[1],
+                        "kind": r[2],
+                        "start_line": r[4] or 1,
+                        "end_line": r[5] or 1,
+                        "score": 0.5,
+                        "snippet": "",
+                        "relationship": "CORE_SYMBOL",
+                    })
+            except Exception:
+                pass
+
         # Pre-ranking artifact & package annotation on candidate_dicts
         from codegraph.indexing.classifier import classify_file
         from codegraph.security import is_sensitive_path

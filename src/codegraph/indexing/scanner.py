@@ -51,6 +51,21 @@ LANGUAGES = {
     ".ejs": "html",
     ".lua": "luau",
     ".luau": "luau",
+    ".go": "go",
+    ".rs": "rust",
+    ".java": "java",
+    ".kt": "kotlin",
+    ".kts": "kotlin",
+    ".c": "c",
+    ".cc": "cpp",
+    ".cpp": "cpp",
+    ".cxx": "cpp",
+    ".h": "c_header",
+    ".hpp": "cpp_header",
+    ".hxx": "cpp_header",
+    ".proto": "proto",
+    ".graphql": "graphql",
+    ".gql": "graphql",
 }
 
 

@@ -28,9 +28,20 @@ def simulate_baseline_agent(repo: Path, task: SWEBenchTask) -> StrategyResult:
     for golden in task.golden_files:
         candidate_paths.append(repo / golden)
 
-    # In baseline, agent reads extra irrelevant files matching generic keywords
-    extra_files = list(repo.glob("**/*.py"))[:3]
-    all_read = list(set(candidate_paths + extra_files))
+    # In baseline, agent reads extra irrelevant files matching generic keywords across polyglot languages
+    ext_map = {
+        "python": ["*.py"],
+        "go": ["*.go"],
+        "rust": ["*.rs"],
+        "typescript": ["*.ts", "*.tsx"],
+        "java": ["*.java", "*.kt"],
+        "cpp": ["*.cpp", "*.cc", "*.h", "*.hpp"],
+    }
+    patterns = ext_map.get(task.language.lower(), ["*.py"])
+    extra_files: list[Path] = []
+    for pat in patterns:
+        extra_files.extend(list(repo.glob(f"**/{pat}"))[:3])
+    all_read = list(set(candidate_paths + extra_files[:3]))
 
     for p in all_read:
         if p.exists() and p.is_file():
@@ -72,14 +83,21 @@ def simulate_codegraph_agent(repo: Path, task: SWEBenchTask) -> StrategyResult:
             mode="FAST",
         )
 
+        tokens = 0
+        lines_read = 0
+        files_read = 0
         if isinstance(packet.budget, dict):
-            tokens = packet.budget.get("selected_tokens", 0)
-            lines_read = packet.budget.get("selected_lines", 0)
-            files_read = packet.budget.get("selected_files", 0)
+            b_tok = packet.budget.get("selected_tokens", 0)
+            b_lines = packet.budget.get("selected_lines", 0)
+            b_files = packet.budget.get("selected_files", 0)
         else:
-            tokens = getattr(packet.budget, "selected_tokens", 0)
-            lines_read = getattr(packet.budget, "selected_lines", 0)
-            files_read = getattr(packet.budget, "selected_files", 0)
+            b_tok = getattr(packet.budget, "selected_tokens", 0)
+            b_lines = getattr(packet.budget, "selected_lines", 0)
+            b_files = getattr(packet.budget, "selected_files", 0)
+
+        tokens = int(b_tok) if isinstance(b_tok, (int, str, float)) else 0
+        lines_read = int(b_lines) if isinstance(b_lines, (int, str, float)) else 0
+        files_read = int(b_files) if isinstance(b_files, (int, str, float)) else 0
 
         # Check if golden target symbol was localized
         localized = False

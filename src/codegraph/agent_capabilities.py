@@ -3169,6 +3169,806 @@ TOOL_CAPABILITY_REGISTRY: tuple[ToolCapabilitySpec, ...] = (
         example_call="find_dead_code()",
         example_interpretation="Inspect dead_symbols, zombie_routes, and orphaned_tables lists in the report.",
     ),
+    # 77. generate_pr_review
+    ToolCapabilitySpec(
+        tool_name="generate_pr_review",
+        capability="pr_review",
+        description=(
+            "Generate comprehensive semantic PR review evaluating structural diffs, caller contract breaks, affected routes, and test gaps. "
+            "Use when reviewing pull requests or evaluating branch changes before merging. "
+            "Does not execute repository code or guarantee merge builds pass without running tests."
+        ),
+        task_types=(
+            AgentTaskCategory.CHANGE_IMPACT.value,
+            AgentTaskCategory.DIAGNOSTIC.value,
+        ),
+        required_inputs=(),
+        optional_inputs=("base_ref", "head_ref"),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=("CALLS", "REFERENCES"),
+        evidence_guarantees="Deterministic 3-way AST merge-base comparison, semantic contract verification, and test coverage gap detection.",
+        does_not_prove="Does not execute repository code or guarantee merge builds pass without running tests.",
+        useful_situations=(
+            "Auditing PR branches for breaking API changes and deleted symbols before merge",
+            "Generating automated Markdown review comments for GitHub Actions PRs",
+            "Checking whether modified HTTP endpoints have covering test cases",
+        ),
+        avoid_when=(
+            "Checking uncommitted local working-tree edits without git commit refs",
+        ),
+        profiles=("full",),
+        minimal_invocation="generate_pr_review()",
+        advanced_invocation='generate_pr_review(base_ref="origin/main", head_ref="HEAD")',
+        result_fields=("base_ref", "head_ref", "verdict", "summary", "findings", "files_changed", "affected_routes", "affected_tests", "suggested_test_command", "markdown_report"),
+        typical_followup="inspect findings list or run suggested_test_command",
+        common_mistakes=(
+            "Passing invalid git revision names",
+        ),
+        example_request="Review this pull request against main and flag any breaking contract changes.",
+        example_call='generate_pr_review(base_ref="main", head_ref="HEAD")',
+        example_interpretation="Inspect verdict ('APPROVE', 'COMMENT', 'REQUEST_CHANGES') and markdown_report.",
+    ),
+    # 78. generate_test_scaffolding
+    ToolCapabilitySpec(
+        tool_name="generate_test_scaffolding",
+        capability="test_generation",
+        description=(
+            "Generate production-ready test scaffolding with fixtures, dependency mocks (DB sessions, HTTP clients), and boundary test cases for a symbol or route. "
+            "Use when writing tests for untested functions or HTTP endpoints. "
+            "Does not execute generated tests or prove test assertions pass without execution."
+        ),
+        task_types=(
+            AgentTaskCategory.TEST_DISCOVERY.value,
+            AgentTaskCategory.DEBUG.value,
+        ),
+        required_inputs=("target",),
+        optional_inputs=("framework",),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=("TESTS", "TESTS_SYMBOL"),
+        evidence_guarantees="Deterministic callee inspection, database dependency tracking, and framework signature analysis.",
+        does_not_prove="Does not execute generated tests or prove test assertions pass without execution.",
+        useful_situations=(
+            "Generating test scaffolding for newly added functions or methods",
+            "Creating integration test templates for FastAPI, Express, or Actix HTTP routes",
+            "Detecting mock requirements (database sessions, external APIs) from call graphs",
+        ),
+        avoid_when=(
+            "Searching for existing test files (use find_tests instead)",
+        ),
+        profiles=("full",),
+        minimal_invocation='generate_test_scaffolding(target="process_payment")',
+        advanced_invocation='generate_test_scaffolding(target="process_payment", framework="pytest")',
+        result_fields=("target_symbol", "target_file", "framework", "suggested_test_file", "test_code", "mock_requirements", "test_cases"),
+        typical_followup="write_file to save the generated test_code into suggested_test_file",
+        common_mistakes=(
+            "Expecting generated mock assertions to contain proprietary business logic without user customization",
+        ),
+        example_request="Generate a pytest test suite for process_payment with database mocks.",
+        example_call='generate_test_scaffolding(target="process_payment")',
+        example_interpretation="Inspect test_code and mock_requirements, then write to suggested_test_file.",
+    ),
+    # 79. federate_repositories
+    ToolCapabilitySpec(
+        tool_name="federate_repositories",
+        capability="monorepo_analysis",
+        description=(
+            "Discover and catalog federated repositories in a multi-repo workspace. "
+            "Use when mapping microservice boundaries and cross-service index sizes. "
+            "Does not modify child repository indices or re-index dirty working trees automatically."
+        ),
+        task_types=(
+            AgentTaskCategory.ARCHITECTURE.value,
+            AgentTaskCategory.PACKAGE.value,
+        ),
+        required_inputs=(),
+        optional_inputs=("workspace_root",),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=("CONTAINS_PACKAGE",),
+        evidence_guarantees="Deterministic inspection of workspace manifests (codegraph.workspace.json) and child repository SQLite indices.",
+        does_not_prove="Does not modify child repository indices or re-index dirty working trees automatically.",
+        useful_situations=(
+            "Mapping all microservices within a multi-repo developer workspace",
+            "Inspecting symbol and route counts across federated service repositories",
+        ),
+        avoid_when=(
+            "Analyzing a single isolated repository without sibling microservices",
+        ),
+        profiles=("full",),
+        minimal_invocation="federate_repositories()",
+        advanced_invocation='federate_repositories(workspace_root="/path/to/workspace")',
+        result_fields=("workspace_root", "repos", "total_repos", "total_links"),
+        typical_followup="find_cross_repo_routes to map inter-service HTTP links",
+        common_mistakes=(
+            "Passing a workspace root that does not contain indexed CodeGraph repositories",
+        ),
+        example_request="List all microservices and repository indices in this workspace.",
+        example_call="federate_repositories()",
+        example_interpretation="Inspect repos list containing name, path, symbol_count, and route_count.",
+    ),
+    # 80. find_cross_repo_routes
+    ToolCapabilitySpec(
+        tool_name="find_cross_repo_routes",
+        capability="route_tracing",
+        description=(
+            "Resolve cross-repository HTTP and RPC service-to-service links across microservices. "
+            "Use when tracing requests across separate repositories. "
+            "Does not prove unobserved dynamic endpoints without static route or URL evidence."
+        ),
+        task_types=(
+            AgentTaskCategory.ROUTE_DISCOVERY.value,
+            AgentTaskCategory.ARCHITECTURE.value,
+        ),
+        required_inputs=(),
+        optional_inputs=("workspace_root", "query"),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=("FETCHES_ROUTE", "ROUTES_TO"),
+        evidence_guarantees="Deterministic cross-repository URL pattern matching against indexed framework_routes tables.",
+        does_not_prove="Does not prove unobserved dynamic endpoints without static route or URL evidence.",
+        useful_situations=(
+            "Tracing an API call in a frontend service to the corresponding backend microservice handler",
+            "Auditing service-to-service communication topologies across a federated workspace",
+        ),
+        avoid_when=(
+            "Searching for routes within a single standalone repository (use find_routes instead)",
+        ),
+        profiles=("full",),
+        minimal_invocation="find_cross_repo_routes()",
+        advanced_invocation='find_cross_repo_routes(query="/api/v1/users")',
+        result_fields=("workspace_root", "total_links", "cross_repo_links"),
+        typical_followup="trace_path or get_file on target_repo and target_file",
+        common_mistakes=(
+            "Querying unindexed sibling repositories",
+        ),
+        example_request="Find which microservice handles the /api/v1/users endpoint called by frontend.",
+        example_call='find_cross_repo_routes(query="/api/v1/users")',
+        example_interpretation="Inspect cross_repo_links for source_repo, target_repo, and target_handler.",
+    ),
+    # 81. store_agent_memory
+    ToolCapabilitySpec(
+        tool_name="store_agent_memory",
+        capability="agent_memory",
+        description=(
+            "Store an agent debugging trajectory, test repair pattern, or architectural decision into persistent memory. "
+            "Use when recording successful bug resolutions or architecture decisions for future recall. "
+            "Does not share stored memory outside the local repository index."
+        ),
+        task_types=(
+            AgentTaskCategory.DEBUG.value,
+            AgentTaskCategory.EXPLANATION.value,
+        ),
+        required_inputs=("title", "resolution"),
+        optional_inputs=("category", "symptoms", "root_cause"),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Atomic persistence into SQLite and FTS5 full-text index with WAL mode concurrency.",
+        does_not_prove="Does not share stored memory outside the local repository index.",
+        useful_situations=(
+            "Saving the root cause and fix for a tricky edge-case bug for future agents",
+            "Recording architectural decisions and component conventions",
+            "Documenting flaky test workarounds and setup prerequisites",
+        ),
+        avoid_when=(
+            "Temporary scratchpad notes that should not persist across sessions",
+        ),
+        profiles=("full",),
+        minimal_invocation='store_agent_memory(title="Fixed Auth Skew", resolution="Added clock leeway")',
+        advanced_invocation='store_agent_memory(title="Fixed Auth Skew", resolution="Added clock leeway", category="BUG_FIX", symptoms="401 error", root_cause="clock drift")',
+        result_fields=("id", "created_at", "session_id", "category", "title", "symptoms", "root_cause", "resolution", "files", "tags", "outcome", "score"),
+        typical_followup="query_agent_memory to recall stored memory",
+        common_mistakes=(
+            "Storing sensitive tokens, secrets, or passwords in memory title or resolution",
+        ),
+        example_request="Save this debugging resolution to agent memory.",
+        example_call='store_agent_memory(title="Fixed token leak", resolution="Closed session in finally block")',
+        example_interpretation="Verify id is returned starting with 'mem_'.",
+    ),
+    # 82. query_agent_memory
+    ToolCapabilitySpec(
+        tool_name="query_agent_memory",
+        capability="agent_memory",
+        description=(
+            "Search past agent debugging memories and architectural decisions using FTS5 BM25 ranking. "
+            "Use when investigating recurring bugs or checking past resolutions. "
+            "Does not guarantee past solutions apply to unrelated bugs without semantic match."
+        ),
+        task_types=(
+            AgentTaskCategory.DEBUG.value,
+            AgentTaskCategory.EXPLANATION.value,
+        ),
+        required_inputs=("query",),
+        optional_inputs=("category", "limit", "max_tokens"),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Deterministic FTS5 BM25 relevance ranking and recency scoring.",
+        does_not_prove="Does not guarantee past solutions apply to unrelated bugs without semantic match.",
+        useful_situations=(
+            "Checking if similar error traces or symptoms have been solved in past sessions",
+            "Recalling previous architectural guidelines or database migration patterns",
+        ),
+        avoid_when=(
+            "Searching codebase symbols (use find_symbol instead) or literal code (use search_code instead)",
+        ),
+        profiles=("full",),
+        minimal_invocation='query_agent_memory(query="auth token expired")',
+        advanced_invocation='query_agent_memory(query="sqlite locked", category="ARCHITECTURE_DECISION", limit=5)',
+        result_fields=("query", "count", "memories"),
+        typical_followup="inspect memories list for symptoms and resolution",
+        common_mistakes=(
+            "Querying empty string without query terms",
+        ),
+        example_request="Have we ever solved a 401 token expiry error in this project?",
+        example_call='query_agent_memory(query="401 token expiry")',
+        example_interpretation="Inspect memories for past resolutions and root causes.",
+    ),
+    # 83. analyze_dataflow_taint
+    ToolCapabilitySpec(
+        tool_name="analyze_dataflow_taint",
+        capability="security_taint_audit",
+        description=(
+            "Analyze source-to-sink dataflow taint paths for injection and security vulnerabilities (SQL injection CWE-89, command execution CWE-78, path traversal CWE-22, SSRF CWE-918, insecure deserialization CWE-502) using AST dataflow tracking. "
+            "Use when auditing endpoint security, sanitization gaps, or vulnerable data sinks. "
+            "Does not execute repository code; reports AST-verified taint propagation chains."
+        ),
+        task_types=(
+            AgentTaskCategory.DEBUG.value,
+            AgentTaskCategory.EXPLANATION.value,
+        ),
+        required_inputs=(),
+        optional_inputs=("entrypoint_symbol", "filter_cwe", "max_depth"),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Deterministic AST source-to-sink variable propagation and sink validation.",
+        does_not_prove="Does not prove runtime exploitability when external WAF or runtime middleware blocks traffic.",
+        useful_situations=(
+            "Auditing user-input flows into raw SQL queries, shell commands, file opens, or HTTP requests",
+            "Checking whether sanitization functions neutralize tainted data before sink execution",
+        ),
+        avoid_when=(
+            "Fixing pure syntax errors or non-security refactoring tasks",
+        ),
+        profiles=("full",),
+        minimal_invocation="analyze_dataflow_taint()",
+        advanced_invocation='analyze_dataflow_taint(filter_cwe="CWE-89", max_depth=10)',
+        result_fields=("repository", "total_vulnerabilities", "critical_count", "high_count", "vulnerabilities"),
+        typical_followup="inspect vulnerabilities list and remediate unsanitized sinks",
+        common_mistakes=(
+            "Assuming absence of taint findings proves total exploit immunity without defense-in-depth review",
+        ),
+        example_request="Are there any SQL injection or command injection vulnerabilities in our route handlers?",
+        example_call='analyze_dataflow_taint(filter_cwe="CWE-89")',
+        example_interpretation="Inspect vulnerabilities for source expression, sink function, and remediation advice.",
+    ),
+    # 84. repair_repository_index
+    ToolCapabilitySpec(
+        tool_name="repair_repository_index",
+        capability="index_self_healing",
+        description=(
+            "Perform automated self-healing, SQLite integrity verification, rebuilding corrupted FTS5 indices, pruning dangling FK references, clearing stale locks, and truncating WAL logs. "
+            "Use when the repository index encounters lock contention, corrupted FTS entries, or orphaned edges. "
+            "Does not delete source repository code."
+        ),
+        task_types=(
+            AgentTaskCategory.DEBUG.value,
+        ),
+        required_inputs=(),
+        optional_inputs=("deep", "vacuum"),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="PRAGMA integrity_check validation and atomic SQLite WAL log truncation.",
+        does_not_prove="Does not restore deleted source files from outside the repository index.",
+        useful_situations=(
+            "Recovering from unexpected process termination, stale lock files, or SQLite disk I/O errors",
+            "Rebuilding full-text search tables when search queries return inconsistent results",
+        ),
+        avoid_when=(
+            "Standard code navigation or routine symbol queries",
+        ),
+        profiles=("full",),
+        minimal_invocation="repair_repository_index()",
+        advanced_invocation="repair_repository_index(deep=True, vacuum=True)",
+        result_fields=("status", "integrity_check_passed", "fts_rebuilt", "wal_checkpointed", "stale_locks_cleared"),
+        typical_followup="re-run failed query or verify healthy index status",
+        common_mistakes=(
+            "Calling vacuum=True on massive repositories inside high-concurrency read loops",
+        ),
+        example_request="The index feels out of sync and search is slow. Can we repair and optimize it?",
+        example_call="repair_repository_index(deep=True, vacuum=True)",
+        example_interpretation="Check status == 'HEALTHY' or 'REPAIRED' and review actions_taken.",
+    ),
+    # 85. get_lsp_diagnostics
+    ToolCapabilitySpec(
+        tool_name="get_lsp_diagnostics",
+        capability="compiler_diagnostics",
+        description=(
+            "Collect live compiler diagnostics, type errors, and lint warnings via Language Server Protocol (LSP) daemons (pyright, gopls, rust-analyzer, clangd). "
+            "Use when diagnosing compile errors, missing types, or verifying code correctness across languages. "
+            "Does not modify source files; reports language-server diagnostics."
+        ),
+        task_types=(
+            AgentTaskCategory.DEBUG.value,
+            AgentTaskCategory.DIAGNOSTIC.value,
+        ),
+        required_inputs=(),
+        optional_inputs=("file_path",),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Compiler-accurate type checker error ranges and diagnostic severities.",
+        does_not_prove="Does not prove runtime correctness in untyped or dynamic script sections.",
+        useful_situations=(
+            "Checking whether recent code edits introduced syntax or type check errors",
+            "Verifying import validity before creating a pull request",
+        ),
+        avoid_when=(
+            "Searching codebase symbols or tracing caller hierarchies",
+        ),
+        profiles=("full",),
+        minimal_invocation="get_lsp_diagnostics()",
+        advanced_invocation='get_lsp_diagnostics(file_path="src/main.py")',
+        result_fields=("workspace", "status", "total_diagnostics", "error_count", "warning_count", "diagnostics"),
+        typical_followup="inspect diagnostics list and fix compiler errors",
+        common_mistakes=(
+            "Assuming failure if host does not have LSP binary installed (falls back gracefully to static analysis)",
+        ),
+        example_request="Are there any compiler or type errors in our modified files?",
+        example_call='get_lsp_diagnostics(file_path="src/service.py")',
+        example_interpretation="Inspect error_count and diagnostics items for line numbers and error codes.",
+    ),
+    # 86. register_agent_session
+    ToolCapabilitySpec(
+        tool_name="register_agent_session",
+        capability="multi_agent_session",
+        description=(
+            "Register an active AI coding agent session in the multi-agent shared workspace. "
+            "Use when joining a swarm or announcing an active coding task to coordinate with other agents. "
+            "Does not acquire file locks."
+        ),
+        task_types=(
+            AgentTaskCategory.ARCHITECTURE.value,
+            AgentTaskCategory.DEBUG.value,
+        ),
+        required_inputs=("agent_id", "name", "task"),
+        optional_inputs=(),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Atomic registration in SQLite WAL workspace registry.",
+        does_not_prove="Does not lock files or prevent uncoordinated file system modifications outside CodeGraph.",
+        useful_situations=(
+            "Announcing an agent's active task to peer agents in a shared repository",
+            "Establishing agent presence before requesting file leases",
+        ),
+        avoid_when=(
+            "Single-agent isolated development without peer agents",
+        ),
+        profiles=("full",),
+        minimal_invocation='register_agent_session(agent_id="agent-1", name="BugFixer", task="Fix 401")',
+        advanced_invocation='register_agent_session(agent_id="agent-1", name="BugFixer", task="Fix 401 error")',
+        result_fields=("agent_id", "name", "task_description", "registered_at", "status"),
+        typical_followup="claim_file_lease on target files before editing",
+        common_mistakes=(
+            "Using empty agent_id or failing to send heartbeats",
+        ),
+        example_request="Register our agent session to coordinate with other agents on this repo.",
+        example_call='register_agent_session(agent_id="claude-1", name="RefactorBot", task="Refactor auth")',
+        example_interpretation="Verify status == 'ACTIVE' and proceed to lease claiming.",
+    ),
+    # 87. claim_file_lease
+    ToolCapabilitySpec(
+        tool_name="claim_file_lease",
+        capability="multi_agent_lease",
+        description=(
+            "Claim a lease lock on a file path to prevent concurrent edit clobbering by other AI agents. "
+            "Use before modifying a file in a multi-agent environment. "
+            "Does not modify file content."
+        ),
+        task_types=(
+            AgentTaskCategory.LOCAL_EDIT.value,
+            AgentTaskCategory.DEBUG.value,
+        ),
+        required_inputs=("agent_id", "file_path"),
+        optional_inputs=("lease_type", "ttl_seconds"),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Atomic mutex lock preventing overlapping write leases.",
+        does_not_prove="Does not prevent manual human edits via external text editors.",
+        useful_situations=(
+            "Locking a core module before applying automated refactoring patches",
+            "Ensuring no teammate agent overwrites a file during multi-file editing",
+        ),
+        avoid_when=(
+            "Read-only queries or symbol discovery",
+        ),
+        profiles=("full",),
+        minimal_invocation='claim_file_lease(agent_id="agent-1", file_path="src/main.py")',
+        advanced_invocation='claim_file_lease(agent_id="agent-1", file_path="src/main.py", lease_type="EXCLUSIVE_WRITE", ttl_seconds=120)',
+        result_fields=("success", "message", "file_path", "agent_id", "lease_type"),
+        typical_followup="apply edits, then release_file_lease",
+        common_mistakes=(
+            "Holding leases indefinitely without renewing TTL or releasing upon task completion",
+        ),
+        example_request="Claim exclusive write lease on src/auth.py before refactoring.",
+        example_call='claim_file_lease(agent_id="agent-1", file_path="src/auth.py")',
+        example_interpretation="Check success is True before editing file.",
+    ),
+    # 88. release_file_lease
+    ToolCapabilitySpec(
+        tool_name="release_file_lease",
+        capability="multi_agent_lease_release",
+        description=(
+            "Release one or all file leases held by an AI agent upon completing task edits. "
+            "Use after committing or discarding file edits. "
+            "Does not delete source files."
+        ),
+        task_types=(
+            AgentTaskCategory.LOCAL_EDIT.value,
+            AgentTaskCategory.DEBUG.value,
+        ),
+        required_inputs=("agent_id",),
+        optional_inputs=("file_path",),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Atomic lease release and lock clearance in SQLite registry.",
+        does_not_prove="Does not commit file changes to git.",
+        useful_situations=(
+            "Releasing file locks so waiting agents can proceed with edits",
+            "Cleaning up leases when an agent finishes its assigned task",
+        ),
+        avoid_when=(
+            "When the agent is still modifying the target file",
+        ),
+        profiles=("full",),
+        minimal_invocation='release_file_lease(agent_id="agent-1")',
+        advanced_invocation='release_file_lease(agent_id="agent-1", file_path="src/main.py")',
+        result_fields=("released_count", "agent_id", "file_path"),
+        typical_followup="get_multi_agent_status to confirm clean workspace",
+        common_mistakes=(
+            "Releasing leases before saving file contents to disk",
+        ),
+        example_request="Release all leases held by agent-1.",
+        example_call='release_file_lease(agent_id="agent-1")',
+        example_interpretation="Verify released_count >= 1.",
+    ),
+    # 89. get_multi_agent_status
+    ToolCapabilitySpec(
+        tool_name="get_multi_agent_status",
+        capability="multi_agent_status",
+        description=(
+            "Return consolidated multi-agent status report including active agent sessions, held file leases, and predicted AST conflicts. "
+            "Use to check if other agents are working on related files. "
+            "Does not acquire locks."
+        ),
+        task_types=(
+            AgentTaskCategory.ARCHITECTURE.value,
+            AgentTaskCategory.DEBUG.value,
+        ),
+        required_inputs=(),
+        optional_inputs=(),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Real-time SQLite inspection of active leases and AST conflict analysis.",
+        does_not_prove="Does not predict future unannounced edits from unregistered agents.",
+        useful_situations=(
+            "Checking who is currently working on what in a multi-agent coding workspace",
+            "Proactively detecting if two agents are modifying caller/callee coupled files",
+        ),
+        avoid_when=(
+            "Routine single-agent local edits",
+        ),
+        profiles=("full",),
+        minimal_invocation="get_multi_agent_status()",
+        advanced_invocation="get_multi_agent_status()",
+        result_fields=("workspace", "total_agents", "active_leases_count", "conflicts_count", "agents", "leases", "conflicts"),
+        typical_followup="review conflicts list and negotiate lease order",
+        common_mistakes=(
+            "Ignoring reported semantic conflicts when planning cross-module refactors",
+        ),
+        example_request="What agents are currently active and are there any file lock conflicts?",
+        example_call="get_multi_agent_status()",
+        example_interpretation="Inspect conflicts list to ensure zero conflicting write leases.",
+    ),
+    # 90. evaluate_speculative_patch
+    ToolCapabilitySpec(
+        tool_name="evaluate_speculative_patch",
+        capability="speculative_sandbox",
+        description=(
+            "Project an in-memory virtual AST branch in RAM to evaluate caller breakages, parameter mismatches, and route mutations without modifying disk files. "
+            "Use before writing refactoring patches. "
+            "Does not modify disk files."
+        ),
+        task_types=(
+            AgentTaskCategory.LOCAL_EDIT.value,
+            AgentTaskCategory.CHANGE_IMPACT.value,
+        ),
+        required_inputs=("patches",),
+        optional_inputs=(),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="In-memory AST parsing and virtual diff contract break detection.",
+        does_not_prove="Does not execute code or run test assertions.",
+        useful_situations=(
+            "Testing candidate function signature edits before committing to disk",
+            "Evaluating whether a proposed refactor removes required parameters",
+        ),
+        avoid_when=(
+            "Simple single-file docstring edits",
+        ),
+        profiles=("full",),
+        minimal_invocation='evaluate_speculative_patch(patches={"src/main.py": "def foo(): pass"})',
+        advanced_invocation='evaluate_speculative_patch(patches={"src/api.py": "def handle(req): pass"})',
+        result_fields=("is_safe", "modified_files", "contract_breaks", "route_mutations", "diff_summary"),
+        typical_followup="apply patch if is_safe is True or fix contract_breaks",
+        common_mistakes=(
+            "Applying invalid syntax in patch content",
+        ),
+        example_request="Will modifying this function signature break any callers?",
+        example_call='evaluate_speculative_patch(patches={"src/auth.py": "def login(user): return True"})',
+        example_interpretation="Inspect is_safe and contract_breaks list.",
+    ),
+    # 91. verify_architectural_rules
+    ToolCapabilitySpec(
+        tool_name="verify_architectural_rules",
+        capability="architecture_governance",
+        description=(
+            "Evaluate declarative architectural boundaries, forbidden cross-module dependencies, and layer rules against the repository index. "
+            "Use when checking pull request compliance with enterprise architecture. "
+            "Does not modify code."
+        ),
+        task_types=(
+            AgentTaskCategory.ARCHITECTURE.value,
+            AgentTaskCategory.DIAGNOSTIC.value,
+        ),
+        required_inputs=(),
+        optional_inputs=("rules",),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Deterministic import edge matching against declarative glob patterns.",
+        does_not_prove="Does not infer architectural intent outside configured rule patterns.",
+        useful_situations=(
+            "Enforcing clean architecture separation between controllers and database models",
+            "Preventing circular or forbidden module dependency leaks",
+        ),
+        avoid_when=(
+            "Localized bug fixes in existing isolated functions",
+        ),
+        profiles=("full",),
+        minimal_invocation="verify_architectural_rules()",
+        advanced_invocation="verify_architectural_rules(rules=[{'name': 'no-db-in-api', 'source_pattern': '*api*', 'cannot_import': ['*db*']}])",
+        result_fields=("status", "total_rules_checked", "violations_count", "violations"),
+        typical_followup="remediate reported rule violations",
+        common_mistakes=(
+            "Assuming compliance if rule patterns do not match source directory layout",
+        ),
+        example_request="Does our code violate any architectural layer boundaries?",
+        example_call="verify_architectural_rules()",
+        example_interpretation="Check status == 'COMPLIANT' and inspect violations list.",
+    ),
+    # 92. find_unreachable_code
+    ToolCapabilitySpec(
+        tool_name="find_unreachable_code",
+        capability="reachability_analysis",
+        description=(
+            "Perform DI-aware root-to-leaf reachability analysis from HTTP routes, CLIs, and crons to detect true dead code with STATIC_VERIFIED confidence. "
+            "Use when pruning dead code or unused legacy modules. "
+            "Does not delete code."
+        ),
+        task_types=(
+            AgentTaskCategory.DIAGNOSTIC.value,
+            AgentTaskCategory.ARCHITECTURE.value,
+        ),
+        required_inputs=(),
+        optional_inputs=(),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="BFS reachability traversal over calls, inheritance, and DI bindings.",
+        does_not_prove="Does not prove unreachability for code invoked via external dynamic reflection or eval.",
+        useful_situations=(
+            "Identifying unused functions, orphaned classes, and abandoned legacy endpoints",
+            "Validating codebase tree-shaking opportunities before major refactors",
+        ),
+        avoid_when=(
+            "Working on library packages intended for external consumer import",
+        ),
+        profiles=("full",),
+        minimal_invocation="find_unreachable_code()",
+        advanced_invocation="find_unreachable_code()",
+        result_fields=("workspace", "total_symbols", "reachable_count", "unreachable_count", "dead_code_percentage"),
+        typical_followup="inspect unreachable_symbols list for candidates to delete",
+        common_mistakes=(
+            "Deleting public library exports that are called only by external downstream consumers",
+        ),
+        example_request="Are there any completely dead or unreachable functions in our project?",
+        example_call="find_unreachable_code()",
+        example_interpretation="Inspect unreachable_symbols list with STATIC_VERIFIED confidence.",
+    ),
+    # 93. generate_semantic_changelog
+    ToolCapabilitySpec(
+        tool_name="generate_semantic_changelog",
+        capability="semantic_changelog",
+        description=(
+            "Synthesize human-readable release changelog categorizing breaking changes, new endpoints, and database mutations from AST diffs. "
+            "Use when writing release notes or preparing deployment summaries. "
+            "Does not modify git repository."
+        ),
+        task_types=(
+            AgentTaskCategory.CHANGE_IMPACT.value,
+            AgentTaskCategory.ARCHITECTURE.value,
+        ),
+        required_inputs=(),
+        optional_inputs=("base_ref", "head_ref"),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="AST-diff categorization of added/removed routes, schema mutations, and API drops.",
+        does_not_prove="Does not document non-code changes such as asset or documentation edits.",
+        useful_situations=(
+            "Summarizing release highlights between two Git release tags",
+            "Listing breaking changes before deploying an API version",
+        ),
+        avoid_when=(
+            "Querying single file syntax",
+        ),
+        profiles=("full",),
+        minimal_invocation="generate_semantic_changelog()",
+        advanced_invocation='generate_semantic_changelog(base_ref="v1.0.0", head_ref="v2.0.0")',
+        result_fields=("base_ref", "head_ref", "total_changes", "breaking_changes_count", "markdown_changelog"),
+        typical_followup="review markdown_changelog output",
+        common_mistakes=(
+            "Using invalid or non-existent Git commit hashes",
+        ),
+        example_request="Generate a release changelog comparing HEAD~5 to HEAD.",
+        example_call='generate_semantic_changelog(base_ref="HEAD~5", head_ref="HEAD")',
+        example_interpretation="Inspect markdown_changelog for breaking changes and new endpoints.",
+    ),
+    # 94. fast_graph_path
+    ToolCapabilitySpec(
+        tool_name="fast_graph_path",
+        capability="compressed_graph_path",
+        description=(
+            "Compute microsecond BFS shortest path between two symbols using the Compressed Sparse Row (CSR) binary graph. "
+            "Use for instant path tracing between caller and callee. "
+            "Does not modify graph."
+        ),
+        task_types=(
+            AgentTaskCategory.TRACE.value,
+            AgentTaskCategory.RELATIONSHIP.value,
+        ),
+        required_inputs=("start_node", "end_node"),
+        optional_inputs=(),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Microsecond breadth-first search path traversal in C-contiguous memory.",
+        does_not_prove="Does not guarantee runtime dataflow execution along static edges.",
+        useful_situations=(
+            "Finding shortest invocation path between an entrypoint route and a database writer",
+            "Tracing dependency chains across microservices or packages",
+        ),
+        avoid_when=(
+            "When node names are unknown (use find_symbol first)",
+        ),
+        profiles=("full",),
+        minimal_invocation='fast_graph_path(start_node="api_login", end_node="UserTable")',
+        advanced_invocation='fast_graph_path(start_node="api_login", end_node="UserTable")',
+        result_fields=("start_node", "end_node", "path", "length"),
+        typical_followup="inspect path array of intermediate symbols",
+        common_mistakes=(
+            "Passing non-existent node names",
+        ),
+        example_request="What is the shortest path between handle_checkout and process_payment?",
+        example_call='fast_graph_path(start_node="handle_checkout", end_node="process_payment")',
+        example_interpretation="Inspect path array for step-by-step caller-callee sequence.",
+    ),
+    # 95. resolve_polymorphic_callees
+    ToolCapabilitySpec(
+        tool_name="resolve_polymorphic_callees",
+        capability="polymorphic_dispatch",
+        description=(
+            "Resolve an abstract interface method or trait invocation to all concrete implementing classes in the workspace. "
+            "Use when tracing dynamic dispatch or trait method implementations. "
+            "Does not execute code."
+        ),
+        task_types=(
+            AgentTaskCategory.RELATIONSHIP.value,
+            AgentTaskCategory.TRACE.value,
+        ),
+        required_inputs=("interface_symbol", "method_name"),
+        optional_inputs=(),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="AST-verified inheritance and interface implementation matching.",
+        does_not_prove="Does not determine runtime active branch when multiple implementers exist.",
+        useful_situations=(
+            "Finding which concrete classes implement an interface like PaymentProcessor.charge()",
+            "Tracing Rust trait methods or Go interface dispatch to concrete structs",
+        ),
+        avoid_when=(
+            "Calling standard non-virtual concrete methods",
+        ),
+        profiles=("full",),
+        minimal_invocation='resolve_polymorphic_callees(interface_symbol="PaymentGateway", method_name="pay")',
+        advanced_invocation='resolve_polymorphic_callees(interface_symbol="PaymentGateway", method_name="pay")',
+        result_fields=("interface_symbol", "method_name", "total_implementations", "implementations"),
+        typical_followup="inspect implementations list for implementing classes",
+        common_mistakes=(
+            "Searching for concrete class instead of interface symbol",
+        ),
+        example_request="Which classes implement IOrderRepository.findById?",
+        example_call='resolve_polymorphic_callees(interface_symbol="IOrderRepository", method_name="findById")',
+        example_interpretation="Review implementations list for concrete class names and file locations.",
+    ),
+    # 96. propagate_interprocedural_dataflow
+    ToolCapabilitySpec(
+        tool_name="propagate_interprocedural_dataflow",
+        capability="interprocedural_dataflow",
+        description=(
+            "Trace inter-procedural dataflow, return type inference, and unguarded None/null dereferences across caller-callee boundaries. "
+            "Use when investigating NullPointerExceptions or type contract violations. "
+            "Does not execute code."
+        ),
+        task_types=(
+            AgentTaskCategory.DEBUG.value,
+            AgentTaskCategory.DIAGNOSTIC.value,
+        ),
+        required_inputs=("target_symbol",),
+        optional_inputs=(),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Inter-procedural signature analysis and caller dereference checking.",
+        does_not_prove="Does not prove runtime null dereference if runtime input guarantees non-null.",
+        useful_situations=(
+            "Checking if a function returning Optional[T] causes AttributeError in downstream callers",
+            "Verifying type propagation across caller boundaries",
+        ),
+        avoid_when=(
+            "Simple single-expression local variable edits",
+        ),
+        profiles=("full",),
+        minimal_invocation='propagate_interprocedural_dataflow(target_symbol="find_user")',
+        advanced_invocation='propagate_interprocedural_dataflow(target_symbol="find_user")',
+        result_fields=("target_symbol", "inferred_return_type", "is_nullable", "nullability_warnings"),
+        typical_followup="add null guards in reported caller locations",
+        common_mistakes=(
+            "Ignoring reported is_nullable warnings in high-traffic endpoints",
+        ),
+        example_request="Does find_user return None and could it crash its callers?",
+        example_call='propagate_interprocedural_dataflow(target_symbol="find_user")',
+        example_interpretation="Inspect is_nullable and nullability_warnings list.",
+    ),
+    # 97. analyze_supply_chain_cve_impact
+    ToolCapabilitySpec(
+        tool_name="analyze_supply_chain_cve_impact",
+        capability="supply_chain_analysis",
+        description=(
+            "Inspect third-party dependency manifests (package.json, go.mod, Cargo.toml, requirements.txt) and trace actual internal call site reachability. "
+            "Use when assessing CVE vulnerability blast radius. "
+            "Does not execute external dependencies."
+        ),
+        task_types=(
+            AgentTaskCategory.PACKAGE.value,
+            AgentTaskCategory.CHANGE_IMPACT.value,
+        ),
+        required_inputs=(),
+        optional_inputs=("target_package",),
+        expected_output_type="dict[str, Any]",
+        relationship_types_returned=(),
+        evidence_guarantees="Manifest parsing and import call-site reachability matching.",
+        does_not_prove="Does not fetch live CVE databases without external network connectivity.",
+        useful_situations=(
+            "Determining if a flagged vulnerable third-party package is actually imported by your code",
+            "Auditing all internal call sites invoking a specific external library",
+        ),
+        avoid_when=(
+            "Searching internal workspace symbols",
+        ),
+        profiles=("full",),
+        minimal_invocation="analyze_supply_chain_cve_impact()",
+        advanced_invocation='analyze_supply_chain_cve_impact(target_package="axios")',
+        result_fields=("workspace", "total_dependencies", "actively_imported_count", "packages", "active_call_sites"),
+        typical_followup="inspect active_call_sites for impacted files",
+        common_mistakes=(
+            "Assuming package is safe just because it is in devDependencies",
+        ),
+        example_request="Is package lodash actively imported and called in our codebase?",
+        example_call='analyze_supply_chain_cve_impact(target_package="lodash")',
+        example_interpretation="Check is_actively_imported and call_sites_count.",
+    ),
 )
 
 _TOOL_BY_NAME: dict[str, ToolCapabilitySpec] = {t.tool_name: t for t in TOOL_CAPABILITY_REGISTRY}
@@ -3475,86 +4275,9 @@ MCP_PROFILE_RECOMMENDATIONS: dict[str, dict[str, object]] = {
     },
     "full": {
         "profile": "full",
-        "tool_count": 76,
+        "tool_count": len(TOOL_CAPABILITY_REGISTRY),
         "recommended_for": "Complete diagnostic, database intelligence, runtime reconciliation, benchmark, and repository administration sessions",
-        "included_tools": [
-            "analyze_change_impact",
-            "analyze_impact",
-            "apply_semantic_patch",
-            "batch_find_callers",
-            "batch_get_context",
-            "batch_get_symbols",
-            "check_api_drift",
-            "check_context_freshness",
-            "check_db_drift",
-            "check_route_schema_drift",
-            "compare_git",
-            "compile_task",
-            "detect_semantic_conflicts",
-            "find_callees",
-            "find_callers",
-            "find_db_callers",
-            "find_db_columns",
-            "find_db_models",
-            "find_db_queries",
-            "find_db_readers",
-            "find_db_relationships",
-            "find_db_tables",
-            "find_db_writers",
-            "find_dead_code",
-            "find_references",
-            "find_related_tests",
-            "find_routes",
-            "find_symbol",
-            "find_tests",
-            "get_architecture",
-            "get_call_graph",
-            "get_callees",
-            "get_callers",
-            "get_change_impact",
-            "get_context",
-            "get_db_impact",
-            "get_db_schema",
-            "get_db_table",
-            "get_dependencies",
-            "get_dependency_graph",
-            "get_dependents",
-            "get_distributed_trace",
-            "get_evidence",
-            "get_file",
-            "get_file_history",
-            "get_file_symbols",
-            "get_git_impact",
-            "get_git_state",
-            "get_graph",
-            "get_imports",
-            "get_live_services",
-            "get_monorepo_packages",
-            "get_project_structure",
-            "get_recent_changes",
-            "get_references",
-            "get_repository_status",
-            "get_resource_status",
-            "get_runtime_trace",
-            "get_symbol",
-            "ingest_runtime_traces",
-            "list_routes",
-            "plan_retrieval",
-            "preview_semantic_patch",
-            "read_file",
-            "reconcile_static_runtime",
-            "resolve_symbol",
-            "rollback_refactor",
-            "safe_rename",
-            "search_code",
-            "search_memory",
-            "search_symbols",
-            "trace_call",
-            "trace_flow",
-            "trace_path",
-            "trace_symbol_history",
-            "verify_evidence",
-        ],
+        "included_tools": sorted(spec.tool_name for spec in TOOL_CAPABILITY_REGISTRY),
     },
 }
 

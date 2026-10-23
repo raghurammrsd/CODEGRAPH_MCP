@@ -319,5 +319,79 @@
     ],
     "example": "codegraph refactor patch patch_spec.json --dry-run",
     "output": "{\n  \"status\": \"APPLIED\",\n  \"files_modified\": 2,\n  \"hunks_applied\": 3,\n  \"rollback_manifest\": \".codegraph/rollback_manifest.json\"\n}"
+  },
+  {
+    "command": "codegraph pr-review [base] [head]",
+    "category": "Git Intelligence",
+    "summary": "Generate semantic PR review evaluating structural diffs, contract breaks, and tests.",
+    "problem_solved": "Detects broken caller contracts, modified HTTP routes without tests, and deleted symbols between branches with actionable Markdown report.",
+    "flags": [
+      "--output-file, -o <path>: Write markdown review to file",
+      "--json: Output structured JSON report"
+    ],
+    "example": "codegraph pr-review main HEAD",
+    "output": "## \ud83d\udd0d CodeGraph Semantic PR Review\nVerdict: \ud83d\udfe2 APPROVED\nFiles Changed: 2 | Symbols Modified: 1 | Affected Routes: 1"
+  },
+  {
+    "command": "codegraph generate-tests <TARGET>",
+    "category": "Code Exploration",
+    "summary": "Generate production-ready test scaffolding with fixtures and dependency mocks.",
+    "problem_solved": "Inspects symbol signatures, callees, and database models to generate immediately runnable test code (pytest, jest, testez).",
+    "flags": [
+      "--framework, -f <str>: Target framework (pytest, jest, testez)",
+      "--output-file, -o <path>: Save generated test suite to file",
+      "--json: Output structured JSON scaffold"
+    ],
+    "example": "codegraph generate-tests process_payment -f pytest",
+    "output": "Generated pytest Test Scaffold for process_payment:\n  Target: src/services/payment.py\n  Detected Mocks: DB_SESSION via database.query"
+  },
+  {
+    "command": "codegraph federate scan [WORKSPACE_ROOT]",
+    "category": "Architecture",
+    "summary": "Discover and catalog federated repositories in a multi-repo microservice workspace.",
+    "problem_solved": "Maps repository boundaries, symbols, routes, and SQLite database paths across microservices.",
+    "flags": [
+      "--json: Output structured JSON report"
+    ],
+    "example": "codegraph federate scan .",
+    "output": "Federated Workspace: /workspace\nDiscovered Repositories (3):\n  - [users-service] Symbols: 450 | Routes: 12\n  - [orders-service] Symbols: 820 | Routes: 18"
+  },
+  {
+    "command": "codegraph federate routes [WORKSPACE_ROOT]",
+    "category": "Architecture",
+    "summary": "Resolve cross-repository HTTP and RPC service-to-service links across microservices.",
+    "problem_solved": "Matches frontend/client HTTP fetch calls to downstream microservice routes across repository boundaries.",
+    "flags": [
+      "--json: Output structured JSON links"
+    ],
+    "example": "codegraph federate routes .",
+    "output": "Cross-Repository Route Links:\n  [STATIC_VERIFIED] frontend:src/api.ts (fetchUsers) -> users-service:src/api.py (list_users)"
+  },
+  {
+    "command": "codegraph memory store --title ... --resolution ...",
+    "category": "Health & Freshness",
+    "summary": "Store agent debugging trajectory or architectural decision into persistent memory.",
+    "problem_solved": "Records root cause, symptoms, and resolution in local FTS5 SQLite index so agents do not repeat past mistakes.",
+    "flags": [
+      "--title, -t <str>: Summary of debugging session",
+      "--resolution, -r <str>: Applied fix or architectural decision",
+      "--category, -c <str>: BUG_FIX, ARCHITECTURE_DECISION, TEST_PATTERN",
+      "--symptoms, -s <str>: Observed error trace or symptom"
+    ],
+    "example": "codegraph memory store -t \"Fixed Auth Skew\" -r \"Added clock leeway\" -c BUG_FIX",
+    "output": "Stored Agent Memory Record [mem_4a81b92c]:\n  Category: BUG_FIX\n  Title: Fixed Auth Skew"
+  },
+  {
+    "command": "codegraph memory search <QUERY>",
+    "category": "Health & Freshness",
+    "summary": "Search past agent debugging memories and decisions using FTS5 BM25 ranking.",
+    "problem_solved": "Recalls past bug investigations and fixes instantly before an agent spends cycles debugging known issues.",
+    "flags": [
+      "--category, -c <str>: Filter by category",
+      "--limit, -l <int>: Max records (default: 5)",
+      "--json: Output structured JSON"
+    ],
+    "example": "codegraph memory search \"auth token expired\"",
+    "output": "Found 1 Agent Memory Record(s) for \"auth token expired\":\n  [BUG_FIX] Fixed Auth Skew (Relevance: 0.95)\n  Resolution: Added clock leeway"
   }
 ]

@@ -7,7 +7,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class SWEBenchTask:
-    """A realistic benchmark problem instance modeled after SWE-bench Lite."""
+    """A realistic benchmark problem instance modeled after SWE-bench Lite across multiple languages."""
 
     instance_id: str
     repository_name: str
@@ -15,6 +15,7 @@ class SWEBenchTask:
     target_symbol: str
     golden_files: tuple[str, ...]
     golden_lines: tuple[int, ...]
+    language: str = "python"
     hints: str = ""
 
 

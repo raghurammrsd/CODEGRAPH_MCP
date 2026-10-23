@@ -116,13 +116,13 @@ def generate_docs():
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://raghurammrsd.github.io/CODE_GRAPH_MCP/">
   <meta property="og:title" content="CodeGraph MCP — Deterministic Code Intelligence Engine">
-  <meta property="og:description" content="Official website and documentation for CodeGraph MCP: deterministic local-first code intelligence with Web UI, VS Code extension, Git-aware diffs, runtime telemetry, database lineage, and 76 verified MCP tools.">
+  <meta property="og:description" content="Official website and documentation for CodeGraph MCP: deterministic local-first code intelligence with Web UI, VS Code extension, Git-aware diffs, runtime telemetry, database lineage, and 82 verified MCP tools.">
   <meta property="og:image" content="https://raghurammrsd.github.io/CODE_GRAPH_MCP/assets/codegraph_logo.jpg">
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:url" content="https://raghurammrsd.github.io/CODE_GRAPH_MCP/">
   <meta name="twitter:title" content="CodeGraph MCP — Deterministic Code Intelligence Engine">
-  <meta name="twitter:description" content="Official website and documentation for CodeGraph MCP: Web UI, VS Code extension, Git-aware diffs, runtime telemetry, database lineage, and 76 verified tools.">
+  <meta name="twitter:description" content="Official website and documentation for CodeGraph MCP: Web UI, VS Code extension, Git-aware diffs, runtime telemetry, database lineage, and 82 verified tools.">
   <meta name="twitter:image" content="https://raghurammrsd.github.io/CODE_GRAPH_MCP/assets/codegraph_logo.jpg">
 
   <script type="application/ld+json">
@@ -138,14 +138,14 @@ def generate_docs():
       "price": "0",
       "priceCurrency": "USD"
     },
-    "description": "Production Model Context Protocol (MCP) server providing Web UI visualizer, VS Code extension, Git-aware repository intelligence, runtime telemetry reconciliation, database lineage, and 76 graph analysis tools for AI coding agents.",
-    "softwareVersion": "3.0.0",
+    "description": "Production Model Context Protocol (MCP) server providing Web UI visualizer, VS Code extension, Git-aware repository intelligence, runtime telemetry reconciliation, database lineage, and 82 graph analysis tools for AI coding agents.",
+    "softwareVersion": "3.0.1",
     "author": {
       "@type": "Person",
       "name": "Raghuram",
       "url": "https://github.com/raghurammrsd"
     },
-    "downloadUrl": "https://pypi.org/project/codegraph-engine/3.0.0/",
+    "downloadUrl": "https://pypi.org/project/codegraph-engine/3.0.1/",
     "codeRepository": "https://github.com/raghurammrsd/CODE_GRAPH_MCP"
   }
   </script>
@@ -805,13 +805,13 @@ def generate_docs():
           <circle cx="16" cy="16" r="3" fill="#2563eb"/>
         </svg>
         <span class="brand-name">CodeGraph MCP</span>
-        <span class="badge-ver">v3.0.0</span>
+        <span class="badge-ver">v3.0.1</span>
       </a>
 
       <!-- Universal Search (Cmd K) -->
       <button class="search-trigger-btn" onclick="openSpotlightModal()" aria-label="Open documentation search">
         <svg class="search-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <span class="search-label-text">Search documentation (76 tools, 26 CLI commands)...</span>
+        <span class="search-label-text">Search documentation (97 tools, 42 CLI commands)...</span>
         <kbd class="kbd-shortcut">Cmd K</kbd>
       </button>
     </div>
@@ -819,9 +819,9 @@ def generate_docs():
     <!-- Top Links & Actions -->
     <div class="header-right-cluster">
       <ul class="top-links-row">
-        <li><a href="#features">Features</a></li>
+        <li><a href="#features">Features (25 Pillars)</a></li>
         <li><a href="#next-steps">Documentation</a></li>
-        <li><a href="#tools-database">MCP Tools (76)</a></li>
+        <li><a href="#tools-database">MCP Tools (97)</a></li>
         <li><a href="#cli-reference">CLI (42)</a></li>
         <li><a href="#benchmarks">Benchmarks</a></li>
       </ul>
@@ -839,7 +839,7 @@ def generate_docs():
     <div>
       <div class="hero-badge-tag">
         <span class="dot-online"></span>
-        <span>v3.0.0 Production · Web UI, VS Code, AI/ML &amp; Three Pillars</span>
+        <span>v3.0.1 Production · 25 Pillars, 97 Verified FastMCP Tools, Multi-Language CSR Engine</span>
       </div>
 
       <h1 class="hero-headline-h1">
@@ -873,7 +873,7 @@ def generate_docs():
           <span>Explore Documentation</span>
           <span>&darr;</span>
         </a>
-        <a href="#tools-database" class="btn-cta-secondary">View 76 MCP Tools</a>
+        <a href="#tools-database" class="btn-cta-secondary">View 82 MCP Tools</a>
       </div>
 
       <div class="cap-pills-row">
@@ -882,7 +882,7 @@ def generate_docs():
         <a href="#git-intelligence-guide" class="cap-pill-btn" style="background:#ecfdf5;color:#059669;border-color:#a7f3d0;">&#10003; Git Intelligence</a>
         <a href="#runtime-telemetry-concept" class="cap-pill-btn rt">&#10003; Runtime Telemetry</a>
         <a href="#database-lineage-concept" class="cap-pill-btn db">&#9670; Database Lineage</a>
-        <a href="#tools-database" class="cap-pill-btn">76 Verified Tools</a>
+        <a href="#tools-database" class="cap-pill-btn">82 Verified Tools</a>
       </div>
     </div>
 
@@ -965,7 +965,7 @@ def generate_docs():
         <div class="code-ide-footer">
           <div class="footer-metric-pill"><span class="metric-val">18ms</span> Latency</div>
           <div class="footer-metric-pill"><span class="metric-val green">-94%</span> Agent Tokens</div>
-          <div class="footer-metric-pill"><span class="metric-val">76</span> MCP Tools</div>
+          <div class="footer-metric-pill"><span class="metric-val">82</span> MCP Tools</div>
           <div class="footer-metric-pill"><span class="metric-val blue">0%</span> Hallucinations</div>
         </div>
 
@@ -1018,14 +1018,14 @@ def generate_docs():
       <div class="feat-arrow-circle">&rarr;</div>
     </a>
 
-    <!-- Card 4: 76 MCP Tools -->
+    <!-- Card 4: 82 MCP Tools -->
     <a href="#tools-database" class="landing-feature-card">
       <div class="feat-card-left">
         <div class="feat-icon-box blue">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
         </div>
         <div class="feat-card-texts">
-          <h3>76 MCP tools server</h3>
+          <h3>82 MCP tools server</h3>
           <p>Expose the graph to Claude Code, Cursor, Codex, and Antigravity.</p>
         </div>
       </div>
@@ -1182,7 +1182,7 @@ def generate_docs():
             <a href="#database-schema-guide">Database Schema &amp; Writers</a> &mdash; find all tables, models, and mutating SQL queries.
           </li>
           <li>
-            <a href="#tools-database">MCP Tools Reference</a> &mdash; 76 verified tools exposed over Model Context Protocol.
+            <a href="#tools-database">MCP Tools Reference</a> &mdash; 82 verified tools exposed over Model Context Protocol.
           </li>
         </ul>
 
@@ -1247,13 +1247,13 @@ codegraph status .</pre>
           <li><strong>Tree-sitter Parsing:</strong> Source files are parsed incrementally into concrete ASTs. Zero LLM hallucinations.</li>
           <li><strong>Relational Graph Storage:</strong> Symbols, calls, imports, and routes are stored in SQLite with foreign-key constraints.</li>
           <li><strong>Deterministic Resolution:</strong> Canonical IDs, qualified names, and route endpoints are resolved with explicit ambiguity states.</li>
-          <li><strong>MCP Tool Serving:</strong> FastMCP stdio/SSE server serves 76 verified tools with token-bounded context packets.</li>
+          <li><strong>MCP Tool Serving:</strong> FastMCP stdio/SSE server serves 82 verified tools with token-bounded context packets.</li>
         </ul>
 
-        <!-- Section: Git-Aware Intelligence (v3.0.0) -->
-        <h2 class="editorial-h2" id="git-intelligence-guide">Git-Aware Repository Intelligence &amp; Merge Conflict Safety (v3.0.0)</h2>
+        <!-- Section: Git-Aware Intelligence (v3.0.1) -->
+        <h2 class="editorial-h2" id="git-intelligence-guide">Git-Aware Repository Intelligence &amp; Merge Conflict Safety (v3.0.1)</h2>
         <p class="editorial-p">
-          CodeGraph MCP v3.0.0 understands how the repository changed across branches and commits, what those changes affect, and whether previously generated context is still valid.
+          CodeGraph MCP v3.0.1 understands how the repository changed across branches and commits, what those changes affect, and whether previously generated context is still valid.
         </p>
         <div class="callout-box git" style="background:#f0fdf4; border-left: 3px solid #10b981; padding: 0.75rem 1rem; border-radius: 6px; margin: 1rem 0;">
           <strong style="color:#047857;">Pre-Merge Safety:</strong> Standard git merge only checks for textual overlaps. CodeGraph checks for <strong>semantic contract conflicts</strong>&mdash;flagging when branch A invokes functions or route handlers that branch B deleted or modified.
@@ -1334,7 +1334,7 @@ codegraph status .</pre>
         </p>
 
         <!-- Reference: 70 MCP Tools -->
-        <h2 class="editorial-h2" id="tools-reference">MCP Tools Reference (76 Verified Tools)</h2>
+        <h2 class="editorial-h2" id="tools-reference">MCP Tools Reference (82 Verified Tools)</h2>
         <p class="editorial-p">
           Every tool exposed by CodeGraph MCP over Model Context Protocol, categorized into Git Intelligence, Database, Runtime, Graph, Core, Routes, and Tests.
         </p>
@@ -1576,10 +1576,10 @@ codegraph status .</pre>
         <!-- Book Page Footer -->
         <footer class="book-page-footer">
           <div>
-            &copy; 2026 CodeGraph MCP &bull; MIT License &bull; v3.0.0 Production
+            &copy; 2026 CodeGraph MCP &bull; MIT License &bull; v3.0.1 Production
           </div>
           <div style="display:flex; gap:1.25rem;">
-            <a href="https://pypi.org/project/codegraph-engine/3.0.0/" target="_blank">PyPI Package</a>
+            <a href="https://pypi.org/project/codegraph-engine/3.0.1/" target="_blank">PyPI Package</a>
             <a href="https://github.com/raghurammrsd/CODE_GRAPH_MCP" target="_blank">GitHub Repository</a>
             <a href="https://github.com/raghurammrsd/CODE_GRAPH_MCP/issues" target="_blank">Issue Tracker</a>
           </div>
@@ -1600,7 +1600,7 @@ codegraph status .</pre>
         <li><a href="#vscode-extension-guide">VS Code Extension</a></li>
         <li><a href="#runtime-telemetry-concept">Runtime Telemetry</a></li>
         <li><a href="#database-lineage-concept">Database Lineage</a></li>
-        <li><a href="#tools-database">MCP Tools (76)</a></li>
+        <li><a href="#tools-database">MCP Tools (82)</a></li>
         <li><a href="#cli-reference">CLI Reference (42)</a></li>
         <li><a href="#benchmarks">Scaling Benchmarks</a></li>
       </ul>
@@ -1613,7 +1613,7 @@ codegraph status .</pre>
     <div class="spotlight-box">
       <div class="spotlight-input-bar">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-        <input type="text" id="spotlightInput" class="spotlight-input" placeholder="Search documentation, 76 tools, CLI commands..." oninput="handleSpotlightSearch(this.value)">
+        <input type="text" id="spotlightInput" class="spotlight-input" placeholder="Search documentation, 97 tools, CLI commands..." oninput="handleSpotlightSearch(this.value)">
       </div>
       <div class="spotlight-results-scroll" id="spotlightResults"></div>
       <div class="spotlight-bottom-bar">

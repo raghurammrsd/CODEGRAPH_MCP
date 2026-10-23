@@ -275,9 +275,13 @@ def _get_html_dashboard() -> str:
         <div style="font-weight: 700; margin-bottom: 4px;">Node Legend</div>
         <div class="legend-item"><div class="legend-color" style="background: var(--accent);"></div>Functions & Methods</div>
         <div class="legend-item"><div class="legend-color" style="background: var(--purple);"></div>Classes & Modules</div>
-        <div class="legend-item"><div class="legend-color" style="background: var(--green);"></div>Routes (FastAPI / Express)</div>
+        <div class="legend-item"><div class="legend-color" style="background: var(--green);"></div>Routes (FastAPI / Express / Spring)</div>
         <div class="legend-item"><div class="legend-color" style="background: var(--amber);"></div>Database Tables / Models</div>
-        <div class="legend-item"><div class="legend-color" style="background: var(--cyan);"></div>React / UI Components</div>
+        <div class="legend-item"><div class="legend-color" style="background: var(--cyan);"></div>Interfaces & Traits</div>
+        <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 6px;">
+          <button id="toggle-3d-btn" onclick="toggle3DMode()" style="background: var(--border); color: var(--text); border: 1px solid var(--border); padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">🌐 Switch to 3D Orbital</button>
+          <button id="export-btn" onclick="exportGraphImage()" style="background: var(--border); color: var(--text); border: 1px solid var(--border); padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">📷 Export Snapshot</button>
+        </div>
       </div>
       <canvas id="graph-canvas"></canvas>
       <div id="node-panel" class="node-detail-panel">
@@ -358,7 +362,7 @@ def _get_html_dashboard() -> str:
       <h4 style="margin-bottom: 12px;">System & Engine Health</h4>
       <table class="data-table">
         <tbody>
-          <tr><td>Operating Engine</td><td>CodeGraph Deterministic Intelligence v3.0.0</td></tr>
+          <tr><td>Operating Engine</td><td>CodeGraph Deterministic Intelligence v3.0.1</td></tr>
           <tr><td>Database Mode</td><td>SQLite WAL (Permanent Concurrency)</td></tr>
           <tr><td>Watcher Daemon</td><td>Sub-15ms Sliding Kernel Push (Active)</td></tr>
           <tr><td>MCP Active Tools</td><td>70 Verified Deterministic Tools</td></tr>
@@ -430,6 +434,26 @@ def _get_html_dashboard() -> str:
     // Force-directed Canvas Simulation
     let nodes = [];
     let edges = [];
+    let is3D = false;
+    let angleX = 0.2;
+    let angleY = 0.3;
+    let isDragging = false;
+    let prevMouseX = 0;
+    let prevMouseY = 0;
+    let blastRipples = [];
+
+    function toggle3DMode() {
+      is3D = !is3D;
+      document.getElementById('toggle-3d-btn').textContent = is3D ? '📊 Switch to 2D Plane' : '🌐 Switch to 3D Orbital';
+    }
+
+    function exportGraphImage() {
+      const canvas = document.getElementById('graph-canvas');
+      const link = document.createElement('a');
+      link.download = 'codegraph-architecture.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
 
     async function renderGraph() {
       const canvas = document.getElementById('graph-canvas');
@@ -444,70 +468,157 @@ def _get_html_dashboard() -> str:
         edges = graphData.edges || [];
 
         nodes.forEach(n => {
-          n.x = canvas.width / 2 + (Math.random() - 0.5) * (canvas.width * 0.7);
-          n.y = canvas.height / 2 + (Math.random() - 0.5) * (canvas.height * 0.7);
-          n.vx = 0; n.vy = 0;
+          n.x = (Math.random() - 0.5) * 400;
+          n.y = (Math.random() - 0.5) * 400;
+          n.z = (Math.random() - 0.5) * 400;
+          n.vx = 0; n.vy = 0; n.vz = 0;
+          n.screenX = 0; n.screenY = 0;
         });
+      }
+
+      function project(x, y, z) {
+        if (!is3D) {
+          return { x: canvas.width / 2 + x, y: canvas.height / 2 + y, scale: 1.0, z: 0 };
+        }
+        // Rotate around Y axis
+        const cosY = Math.cos(angleY), sinY = Math.sin(angleY);
+        const x1 = x * cosY + z * sinY;
+        const z1 = -x * sinY + z * cosY;
+
+        // Rotate around X axis
+        const cosX = Math.cos(angleX), sinX = Math.sin(angleX);
+        const y2 = y * cosX - z1 * sinX;
+        const z2 = y * sinX + z1 * cosX;
+
+        const focal = 600;
+        const scale = focal / (focal + z2 + 300);
+        return {
+          x: canvas.width / 2 + x1 * scale,
+          y: canvas.height / 2 + y2 * scale,
+          scale: Math.max(0.2, scale),
+          z: z2,
+        };
       }
 
       function tick() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        // Project nodes
+        nodes.forEach(n => {
+          const p = project(n.x, n.y, n.z);
+          n.screenX = p.x;
+          n.screenY = p.y;
+          n.scale = p.scale;
+          n.depthZ = p.z;
+        });
+
+        // Draw blast ripples
+        for (let i = blastRipples.length - 1; i >= 0; i--) {
+          const rip = blastRipples[i];
+          rip.radius += 4;
+          rip.alpha -= 0.02;
+          if (rip.alpha <= 0) {
+            blastRipples.splice(i, 1);
+            continue;
+          }
+          ctx.beginPath();
+          ctx.arc(rip.x, rip.y, rip.radius, 0, 2 * Math.PI);
+          ctx.strokeStyle = `rgba(248, 81, 73, ${rip.alpha})`;
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        }
+
         // Draw edges
-        ctx.strokeStyle = 'rgba(88, 166, 255, 0.2)';
         ctx.lineWidth = 1;
         edges.forEach(e => {
           const s = nodes[e.sourceIndex];
           const t = nodes[e.targetIndex];
           if (s && t) {
+            ctx.strokeStyle = 'rgba(88, 166, 255, 0.25)';
             ctx.beginPath();
-            ctx.moveTo(s.x, s.y);
-            ctx.lineTo(t.x, t.y);
+            ctx.moveTo(s.screenX, s.screenY);
+            ctx.lineTo(t.screenX, t.screenY);
             ctx.stroke();
           }
         });
 
+        // Sort nodes by depth for 3D realism
+        const sortedNodes = is3D ? [...nodes].sort((a, b) => b.depthZ - a.depthZ) : nodes;
+
         // Draw nodes
-        nodes.forEach(n => {
+        sortedNodes.forEach(n => {
+          const r = (n.radius || 6) * (n.scale || 1.0);
           ctx.beginPath();
-          ctx.arc(n.x, n.y, n.radius || 6, 0, 2 * Math.PI);
+          ctx.arc(n.screenX, n.screenY, r, 0, 2 * Math.PI);
           ctx.fillStyle = n.color || '#58a6ff';
+          ctx.shadowColor = n.color || '#58a6ff';
+          ctx.shadowBlur = is3D ? 8 : 0;
           ctx.fill();
+          ctx.shadowBlur = 0;
 
           // Labels
-          if (nodes.length < 150) {
+          if (nodes.length < 160 && (n.scale || 1.0) > 0.6) {
             ctx.fillStyle = '#8b949e';
-            ctx.font = '10px monospace';
-            ctx.fillText(n.name, n.x + 8, n.y + 3);
+            ctx.font = `${Math.floor(10 * (n.scale || 1.0))}px monospace`;
+            ctx.fillText(n.name, n.screenX + 8, n.screenY + 3);
           }
         });
 
-        // Simple physics step
-        nodes.forEach((n, i) => {
-          // Centering force
-          n.vx += (canvas.width / 2 - n.x) * 0.0005;
-          n.vy += (canvas.height / 2 - n.y) * 0.0005;
-          // Apply velocity
-          n.x += n.vx; n.y += n.vy;
-          n.vx *= 0.85; n.vy *= 0.85;
+        // 3D Orbital rotation momentum if not dragging
+        if (is3D && !isDragging) {
+          angleY += 0.002;
+        }
+
+        // Physics step
+        nodes.forEach(n => {
+          n.vx -= n.x * 0.0008;
+          n.vy -= n.y * 0.0008;
+          n.vz -= n.z * 0.0008;
+          n.x += n.vx; n.y += n.vy; n.z += n.vz;
+          n.vx *= 0.88; n.vy *= 0.88; n.vz *= 0.88;
         });
       }
 
-      setInterval(() => { if (document.getElementById("view-graph").style.display !== "none") tick(); }, 30);
+      setInterval(() => {
+        if (document.getElementById("graph-pane").classList.contains("active")) tick();
+      }, 30);
     }
 
-    canvas = document.getElementById('graph-canvas');
-    canvas.addEventListener('click', e => {
-      const rect = canvas.getBoundingClientRect();
+    const canvasElem = document.getElementById('graph-canvas');
+    canvasElem.addEventListener('mousedown', e => {
+      isDragging = true;
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
+    });
+
+    window.addEventListener('mouseup', () => { isDragging = false; });
+
+    canvasElem.addEventListener('mousemove', e => {
+      if (isDragging && is3D) {
+        const dx = e.clientX - prevMouseX;
+        const dy = e.clientY - prevMouseY;
+        angleY += dx * 0.008;
+        angleX += dy * 0.008;
+        prevMouseX = e.clientX;
+        prevMouseY = e.clientY;
+      }
+    });
+
+    canvasElem.addEventListener('click', e => {
+      const rect = canvasElem.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      const hit = nodes.find(n => Math.hypot(n.x - x, n.y - y) < 12);
+      const hit = nodes.find(n => Math.hypot(n.screenX - x, n.screenY - y) < 14);
       if (hit) {
+        // Trigger blast ripple
+        blastRipples.push({ x: hit.screenX, y: hit.screenY, radius: 8, alpha: 1.0 });
+
         const panel = document.getElementById('node-panel');
         document.getElementById('panel-title').textContent = hit.name;
         document.getElementById('panel-content').innerHTML = `
           <strong>Kind:</strong> ${hit.kind || 'Symbol'}<br>
           <strong>File:</strong> ${hit.path || 'unknown'}:${hit.line || 1}<br>
+          <strong>Language:</strong> ${hit.language || 'polyglot'}<br>
           <strong>Canonical ID:</strong> <span style="font-family:monospace;">${hit.id || hit.name}</span>
         `;
         panel.style.display = 'block';
@@ -664,35 +775,45 @@ class CodeGraphUIRequestHandler(BaseHTTPRequestHandler):
     def _handle_api_graph(self) -> None:
         try:
             query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            limit = int(query.get("max_nodes", [150])[0])
+            limit = int(query.get("max_nodes", [200])[0])
+            lang_filter = query.get("language", [None])[0]
             with self.indexer.session() as con:
-                sym_rows = con.execute(
-                    f"SELECT id, name, kind, path, start_line FROM symbols LIMIT {limit}"
-                ).fetchall()
+                sql = "SELECT id, name, kind, path, start_line, language FROM symbols"
+                params: list[Any] = []
+                if lang_filter:
+                    sql += " WHERE language = ?"
+                    params.append(lang_filter)
+                sql += f" LIMIT {limit}"
+
+                sym_rows = con.execute(sql, params).fetchall()
                 node_map: dict[str, int] = {}
                 nodes = []
                 for idx, r in enumerate(sym_rows):
                     nid = str(r["id"])
                     node_map[nid] = idx
                     kind = str(r["kind"]).upper()
+                    lang = str(r["language"] if "language" in r.keys() else "unknown")
                     color = "#58a6ff"
-                    if "CLASS" in kind:
+                    if "CLASS" in kind or "STRUCT" in kind:
                         color = "#bc8cff"
                     elif "ROUTE" in kind:
                         color = "#3fb950"
                     elif "TABLE" in kind:
                         color = "#d29922"
+                    elif "INTERFACE" in kind:
+                        color = "#38bdf8"
                     nodes.append({
                         "id": nid,
                         "name": str(r["name"]),
                         "kind": kind,
                         "path": str(r["path"]),
                         "line": int(r["start_line"]),
+                        "language": lang,
                         "color": color,
                     })
 
                 edge_rows = con.execute(
-                    "SELECT source, target, relationship FROM graph_edges LIMIT 300"
+                    "SELECT source, target, relationship FROM graph_edges LIMIT 500"
                 ).fetchall()
                 edges = []
                 for e in edge_rows:

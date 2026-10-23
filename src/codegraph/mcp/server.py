@@ -612,7 +612,7 @@ def create_server(
             return [
                 dict(r)
                 for r in con.execute(
-                    "SELECT source_path,imported FROM imports ORDER BY source_path,imported LIMIT 500"
+                    "SELECT source_path, COALESCE(NULLIF(imported_module, ''), module) AS imported FROM imports ORDER BY source_path, imported LIMIT 500"
                 )
             ]
 
@@ -1217,6 +1217,186 @@ def create_server(
                 pass
         return result.to_dict()
 
+    def generate_pr_review(base_ref: str = "main", head_ref: str = "HEAD") -> dict[str, Any]:
+        """Generate comprehensive semantic PR review evaluating structural diffs, caller contract breaks, affected routes, and test gaps. Use when reviewing pull requests or evaluating branch changes before merging. Does not execute repository code."""
+        from codegraph.pr_review import generate_pr_review as impl_pr_review
+        with indexer.session() as con:
+            return impl_pr_review(indexer.repository, base_ref=base_ref, head_ref=head_ref, con=con).as_dict()
+
+    def generate_test_scaffolding(target: str, framework: str | None = None) -> dict[str, Any]:
+        """Generate production-ready test scaffolding with fixtures, dependency mocks (DB sessions, HTTP clients), and boundary test cases for a symbol or route. Use when writing tests for untested functions or HTTP endpoints. Does not execute the generated test code."""
+        from codegraph.test_gen import generate_test_scaffolding as impl_gen_test
+        with indexer.session() as con:
+            return impl_gen_test(con, target=target, repository=indexer.repository, framework=framework).as_dict()
+
+    def federate_repositories(workspace_root: str | None = None) -> dict[str, Any]:
+        """Discover and catalog federated repositories in a multi-repo workspace. Use when mapping microservice boundaries and cross-service index sizes. Does not modify child repository indices."""
+        from codegraph.federation import federate_workspace
+        root = Path(workspace_root) if workspace_root else indexer.repository.parent
+        return federate_workspace(root).as_dict()
+
+    def find_cross_repo_routes(workspace_root: str | None = None, query: str | None = None) -> dict[str, Any]:
+        """Resolve cross-repository HTTP and RPC service-to-service links across microservices. Use when tracing requests across separate repositories. Does not guess unobserved endpoints without route evidence."""
+        from codegraph.federation import federate_workspace
+        root = Path(workspace_root) if workspace_root else indexer.repository.parent
+        rep = federate_workspace(root)
+        links = rep.cross_repo_links
+        if query:
+            clean_q = query.lower()
+            links = [item for item in links if clean_q in item.route_path.lower() or clean_q in item.target_repo.lower() or clean_q in item.source_repo.lower()]
+        return {
+            "workspace_root": rep.workspace_root,
+            "total_links": len(links),
+            "cross_repo_links": [item.as_dict() for item in links],
+        }
+
+    def store_agent_memory(
+        title: str,
+        resolution: str,
+        category: str = "BUG_FIX",
+        symptoms: str = "",
+        root_cause: str = "",
+    ) -> dict[str, Any]:
+        """Store an agent debugging trajectory, test repair pattern, or architectural decision into persistent memory. Use when recording successful bug resolutions or architecture decisions for future recall. Does not share memory outside the local repository index."""
+        from codegraph.memory.trajectory import get_trajectory_memory_store
+        store = get_trajectory_memory_store(indexer.repository)
+        return store.store(
+            title=title,
+            resolution=resolution,
+            category=category,
+            symptoms=symptoms,
+            root_cause=root_cause,
+        ).as_dict()
+
+    def query_agent_memory(
+        query: str,
+        category: str | None = None,
+        limit: int = 5,
+        max_tokens: int = 1500,
+    ) -> dict[str, Any]:
+        """Search past agent debugging memories and architectural decisions using FTS5 BM25 ranking. Use when investigating recurring bugs or checking past resolutions. Does not execute stored resolution code."""
+        from codegraph.memory.trajectory import get_trajectory_memory_store
+        store = get_trajectory_memory_store(indexer.repository)
+        records = store.search(query=query, category=category, limit=limit, max_tokens=max_tokens)
+        return {
+            "query": query,
+            "count": len(records),
+            "memories": [r.as_dict() for r in records],
+        }
+
+    def analyze_dataflow_taint(
+        entrypoint_symbol: str | None = None,
+        filter_cwe: str | None = None,
+        max_depth: int = 12,
+    ) -> dict[str, Any]:
+        """Analyze source-to-sink dataflow taint paths for injection and security vulnerabilities (SQL injection, command execution, path traversal, SSRF, insecure deserialization) using AST dataflow tracking. Use when auditing endpoint security, sanitization gaps, or vulnerable data sinks. Does not execute repository code."""
+        from codegraph.security.taint import audit_repository_taint
+        with indexer.session() as con:
+            return audit_repository_taint(indexer.repository, con=con, entrypoint_symbol=entrypoint_symbol, filter_cwe=filter_cwe, max_depth=max_depth).as_dict()
+
+    def repair_repository_index(
+        deep: bool = True,
+        vacuum: bool = False,
+    ) -> dict[str, Any]:
+        """Perform automated self-healing, SQLite integrity verification, rebuilding corrupted FTS5 indices, pruning dangling FK references, clearing stale locks, and truncating WAL logs. Use when the repository index encounters lock contention, corrupted FTS entries, or orphaned edges. Does not delete source repository code."""
+        from codegraph.repair import repair_repository_index as impl_repair
+        return impl_repair(indexer.repository, deep=deep, vacuum=vacuum).as_dict()
+
+    def get_lsp_diagnostics(file_path: str | None = None) -> dict[str, Any]:
+        """Collect live compiler diagnostics, type errors, and lint warnings via Language Server Protocol (LSP) daemons (pyright, gopls, rust-analyzer, clangd). Use when diagnosing compile errors or verifying code correctness. Does not modify source files."""
+        from codegraph.lsp_bridge.bridge import collect_lsp_diagnostics
+        return collect_lsp_diagnostics(indexer.repository, file_path=file_path).as_dict()
+
+    def register_agent_session(agent_id: str, name: str, task: str) -> dict[str, Any]:
+        """Register an active AI coding agent session in the multi-agent shared workspace. Use when joining a swarm or announcing an active coding task to coordinate with other agents. Does not lock files."""
+        from codegraph.multi_agent.coordinator import MultiAgentCoordinator
+        coord = MultiAgentCoordinator(indexer.repository)
+        return coord.register_session(agent_id, name, task).as_dict()
+
+    def claim_file_lease(
+        agent_id: str,
+        file_path: str,
+        lease_type: str = "EXCLUSIVE_WRITE",
+        ttl_seconds: float = 60.0,
+    ) -> dict[str, Any]:
+        """Claim a lease lock on a file path to prevent concurrent edit clobbering by other AI agents. Use before modifying a file in a multi-agent environment. Does not modify file content."""
+        from codegraph.multi_agent.coordinator import MultiAgentCoordinator
+        coord = MultiAgentCoordinator(indexer.repository)
+        ok, msg = coord.claim_lease(agent_id, file_path, lease_type=lease_type, ttl_seconds=ttl_seconds)
+        return {"success": ok, "message": msg, "file_path": file_path, "agent_id": agent_id, "lease_type": lease_type}
+
+    def release_file_lease(agent_id: str, file_path: str | None = None) -> dict[str, Any]:
+        """Release one or all file leases held by an AI agent upon completing task edits. Use after committing or discarding file edits. Does not delete source files."""
+        from codegraph.multi_agent.coordinator import MultiAgentCoordinator
+        coord = MultiAgentCoordinator(indexer.repository)
+        released_count = coord.release_lease(agent_id, file_path)
+        return {"released_count": released_count, "agent_id": agent_id, "file_path": file_path}
+
+    def get_multi_agent_status() -> dict[str, Any]:
+        """Return consolidated multi-agent status report including active agent sessions, held file leases, and predicted AST conflicts. Use to check if other agents are working on related files. Does not acquire locks."""
+        from codegraph.multi_agent.coordinator import MultiAgentCoordinator
+        coord = MultiAgentCoordinator(indexer.repository)
+        with indexer.session() as con:
+            conflicts = coord.check_conflicts(con=con)
+            rep = coord.get_status_report()
+            rep.conflicts = conflicts
+            rep.conflicts_count = len(conflicts)
+            return rep.as_dict()
+
+    def evaluate_speculative_patch(patches: dict[str, str]) -> dict[str, Any]:
+        """Project an in-memory virtual AST branch in RAM to evaluate caller breakages, parameter mismatches, and route mutations without modifying disk files. Use before writing refactoring patches. Does not modify disk files."""
+        from codegraph.sandbox import evaluate_speculative_patch as impl_sandbox
+        with indexer.session() as con:
+            return impl_sandbox(indexer.repository, file_patches=patches, con=con).as_dict()
+
+    def verify_architectural_rules(rules: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+        """Evaluate declarative architectural boundaries, forbidden cross-module dependencies, and layer rules against the repository index. Use when checking pull request compliance with enterprise architecture. Does not modify code."""
+        from codegraph.architecture_rules import evaluate_architecture_rules as impl_arch
+        with indexer.session() as con:
+            return impl_arch(indexer.repository, con=con, rules=rules).as_dict()
+
+    def find_unreachable_code() -> dict[str, Any]:
+        """Perform DI-aware root-to-leaf reachability analysis from HTTP routes, CLIs, and crons to detect true dead code with STATIC_VERIFIED confidence. Use when pruning dead code. Does not delete code."""
+        from codegraph.reachability import compute_di_aware_reachability as impl_reach
+        with indexer.session() as con:
+            return impl_reach(indexer.repository, con=con).as_dict()
+
+    def generate_semantic_changelog(base_ref: str = "HEAD~1", head_ref: str = "HEAD") -> dict[str, Any]:
+        """Synthesize human-readable release changelog categorizing breaking changes, new endpoints, and database mutations from AST diffs. Use when writing release notes. Does not modify git repository."""
+        from codegraph.changelog import generate_semantic_changelog as impl_changelog
+        return impl_changelog(indexer.repository, base_ref=base_ref, head_ref=head_ref).as_dict()
+
+    def fast_graph_path(start_node: str, end_node: str) -> dict[str, Any]:
+        """Compute microsecond BFS shortest path between two symbols using the Compressed Sparse Row (CSR) binary graph. Use for instant path tracing between caller and callee. Does not modify graph."""
+        from codegraph.graph_csr import CSRGraph
+        with indexer.session() as con:
+            cur = con.cursor()
+            cur.execute("SELECT source, target, relationship FROM graph_edges LIMIT 5000;")
+            edges = [(str(r[0]), str(r[1]), str(r[2])) for r in cur.fetchall()]
+        csr = CSRGraph.build_from_edges(edges)
+        path = csr.shortest_path(start_node, end_node)
+        return {"start_node": start_node, "end_node": end_node, "path": path, "length": len(path) if path else 0}
+
+    def resolve_polymorphic_callees(interface_symbol: str, method_name: str) -> dict[str, Any]:
+        """Resolve an abstract interface method or trait invocation to all concrete implementing classes in the workspace. Use when tracing dynamic dispatch or trait method implementations. Does not execute code."""
+        from codegraph.polymorphism import resolve_polymorphic_callees as impl_poly
+        with indexer.session() as con:
+            return impl_poly(con, interface_symbol=interface_symbol, method_name=method_name).as_dict()
+
+    def propagate_interprocedural_dataflow(target_symbol: str) -> dict[str, Any]:
+        """Trace inter-procedural dataflow, return type inference, and unguarded None/null dereferences across caller-callee boundaries. Use when investigating NullPointerExceptions or type contract violations. Does not execute code."""
+        from codegraph.dataflow_propagation import (
+            propagate_interprocedural_dataflow as impl_dataflow,
+        )
+        with indexer.session() as con:
+            return impl_dataflow(con, target_symbol=target_symbol).as_dict()
+
+    def analyze_supply_chain_cve_impact(target_package: str | None = None) -> dict[str, Any]:
+        """Inspect third-party dependency manifests (package.json, go.mod, Cargo.toml, requirements.txt) and trace actual internal call site reachability. Use when assessing CVE vulnerability blast radius. Does not execute external dependencies."""
+        from codegraph.security.supply_chain import analyze_supply_chain as impl_supply
+        with indexer.session() as con:
+            return impl_supply(indexer.repository, con=con, target_package=target_package).as_dict()
+
     core_tools: dict[str, Any] = {
         "resolve_symbol": resolve_symbol,
         "search_symbols": search_symbols,
@@ -1311,6 +1491,27 @@ def create_server(
         "check_api_drift": check_api_drift,
         "get_monorepo_packages": get_monorepo_packages,
         "find_dead_code": find_dead_code,
+        "generate_pr_review": generate_pr_review,
+        "generate_test_scaffolding": generate_test_scaffolding,
+        "federate_repositories": federate_repositories,
+        "find_cross_repo_routes": find_cross_repo_routes,
+        "store_agent_memory": store_agent_memory,
+        "query_agent_memory": query_agent_memory,
+        "analyze_dataflow_taint": analyze_dataflow_taint,
+        "repair_repository_index": repair_repository_index,
+        "get_lsp_diagnostics": get_lsp_diagnostics,
+        "register_agent_session": register_agent_session,
+        "claim_file_lease": claim_file_lease,
+        "release_file_lease": release_file_lease,
+        "get_multi_agent_status": get_multi_agent_status,
+        "evaluate_speculative_patch": evaluate_speculative_patch,
+        "verify_architectural_rules": verify_architectural_rules,
+        "find_unreachable_code": find_unreachable_code,
+        "generate_semantic_changelog": generate_semantic_changelog,
+        "fast_graph_path": fast_graph_path,
+        "resolve_polymorphic_callees": resolve_polymorphic_callees,
+        "propagate_interprocedural_dataflow": propagate_interprocedural_dataflow,
+        "analyze_supply_chain_cve_impact": analyze_supply_chain_cve_impact,
     }
 
     agent_names = {

@@ -1888,6 +1888,500 @@ def git_conflicts_cmd(
                 cli_echo(f"    Head ({head}): {c.head_file} ({c.head_evidence})")
 
 
+agent_memory_app = typer.Typer(
+    help="Long-term agent trajectory & debugging memory store.",
+    no_args_is_help=True,
+)
+app.add_typer(agent_memory_app, name="agent-memory")
+
+
+@agent_memory_app.command("store")
+def memory_store_cmd(
+    title: Annotated[str, typer.Option("--title", "-t", help="Title or summary of the debugging session/decision")],
+    resolution: Annotated[str, typer.Option("--resolution", "-r", help="Resolution or architectural fix applied")],
+    category: Annotated[str, typer.Option("--category", "-c", help="Category: BUG_FIX, ARCHITECTURE_DECISION, TEST_PATTERN, ROOT_CAUSE")] = "BUG_FIX",
+    symptoms: Annotated[str, typer.Option("--symptoms", "-s", help="Observed symptoms or error traces")] = "",
+    root_cause: Annotated[str, typer.Option("--root-cause", help="Identified root cause")] = "",
+    path: Annotated[Path | None, typer.Option("--path", "-p", help="Repository path")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Store an agent debugging trajectory or architectural decision into persistent memory."""
+    from codegraph.memory.trajectory import get_trajectory_memory_store
+
+    repo = _resolve_repo(path, repository)
+    store = get_trajectory_memory_store(repo)
+    record = store.store(
+        title=title,
+        resolution=resolution,
+        category=category,
+        symptoms=symptoms,
+        root_cause=root_cause,
+    )
+
+    if json_output:
+        cli_echo(json.dumps(record.as_dict(), indent=2), json_mode=True)
+    else:
+        cli_echo(f"Stored Agent Memory Record [{record.id}]:")
+        cli_echo(f"  Category:   {record.category}")
+        cli_echo(f"  Title:      {record.title}")
+        cli_echo(f"  Resolution: {record.resolution}")
+
+
+@agent_memory_app.command("search")
+def memory_search_cmd(
+    query: Annotated[str, typer.Argument(help="Search query matching symptoms, title, root cause, or resolution")],
+    category: Annotated[str | None, typer.Option("--category", "-c", help="Filter by category")] = None,
+    limit: Annotated[int, typer.Option("--limit", "-l", help="Max records to return")] = 5,
+    path: Annotated[Path | None, typer.Option("--path", "-p", help="Repository path")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Search past agent debugging memories and architectural decisions using FTS5 BM25 ranking."""
+    from codegraph.memory.trajectory import get_trajectory_memory_store
+
+    repo = _resolve_repo(path, repository)
+    store = get_trajectory_memory_store(repo)
+    records = store.search(query=query, category=category, limit=limit)
+
+    if json_output:
+        cli_echo(json.dumps([r.as_dict() for r in records], indent=2), json_mode=True)
+    else:
+        cli_echo(f"Found {len(records)} Agent Memory Record(s) for '{query}':")
+        for r in records:
+            cli_echo(f"\n  [{r.category}] {r.title} (Relevance: {r.score})")
+            if r.symptoms:
+                cli_echo(f"    Symptoms:   {r.symptoms}")
+            if r.root_cause:
+                cli_echo(f"    Root Cause: {r.root_cause}")
+            cli_echo(f"    Resolution: {r.resolution}")
+
+
+@agent_memory_app.command("list")
+def memory_list_cmd(
+    limit: Annotated[int, typer.Option("--limit", "-l", help="Max records to return")] = 10,
+    path: Annotated[Path | None, typer.Option("--path", "-p", help="Repository path")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """List recent agent memories."""
+    from codegraph.memory.trajectory import get_trajectory_memory_store
+
+    repo = _resolve_repo(path, repository)
+    store = get_trajectory_memory_store(repo)
+    records = store.list_recent(limit=limit)
+
+    if json_output:
+        cli_echo(json.dumps([r.as_dict() for r in records], indent=2), json_mode=True)
+    else:
+        cli_echo(f"Recent Agent Memories ({len(records)}):")
+        for r in records:
+            cli_echo(f"  [{r.id}] ({r.category}) {r.title} - {r.created_at}")
+
+
+@agent_memory_app.command("clear")
+def memory_clear_cmd(
+    path: Annotated[Path | None, typer.Option("--path", "-p", help="Repository path")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "--repo", help="Repository path")] = None,
+) -> None:
+    """Clear all agent memory records for the repository."""
+    from codegraph.memory.trajectory import get_trajectory_memory_store
+
+    repo = _resolve_repo(path, repository)
+    store = get_trajectory_memory_store(repo)
+    store.clear()
+    cli_echo("Agent memory cleared.")
+
+
+federate_app = typer.Typer(
+    help="Cross-repository & microservice graph federation commands.",
+    no_args_is_help=True,
+)
+app.add_typer(federate_app, name="federate")
+
+
+@federate_app.command("scan")
+def federate_scan_cmd(
+    workspace_root: Annotated[Path | None, typer.Argument(help="Workspace directory containing repositories (default: current directory)")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Discover federated repositories and index sizes in a multi-repo workspace."""
+    from codegraph.federation import federate_workspace
+
+    root = workspace_root or Path.cwd()
+    report = federate_workspace(root)
+
+    if json_output:
+        cli_echo(json.dumps(report.as_dict(), indent=2), json_mode=True)
+    else:
+        cli_echo(f"Federated Workspace: {report.workspace_root}")
+        cli_echo(f"Discovered Repositories ({len(report.repos)}):")
+        for r in report.repos:
+            cli_echo(f"  - [{r.name}] {r.path}")
+            cli_echo(f"    Symbols: {r.symbol_count} | Routes: {r.route_count} | Database: {r.db_path}")
+
+
+@federate_app.command("routes")
+def federate_routes_cmd(
+    workspace_root: Annotated[Path | None, typer.Argument(help="Workspace directory containing repositories (default: current directory)")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Resolve cross-repository HTTP and RPC service-to-service links across microservices."""
+    from codegraph.federation import federate_workspace
+
+    root = workspace_root or Path.cwd()
+    report = federate_workspace(root)
+
+    if json_output:
+        cli_echo(json.dumps(report.as_dict(), indent=2), json_mode=True)
+    else:
+        cli_echo(f"Cross-Repository Route Links in {report.workspace_root}:")
+        if not report.cross_repo_links:
+            cli_echo("  No cross-repository route calls discovered.")
+        for link in report.cross_repo_links:
+            cli_echo(
+                f"  [{link.confidence}] {link.source_repo}:{link.source_file} ({link.source_symbol})\n"
+                f"    --[{link.http_method} {link.route_path}]-->\n"
+                f"    {link.target_repo}:{link.target_file} ({link.target_handler})"
+            )
+
+
+@app.command("generate-tests")
+def generate_tests_cmd(
+    target: Annotated[str, typer.Argument(help="Symbol name, canonical ID, or HTTP route path to generate tests for")],
+    framework: Annotated[str | None, typer.Option("--framework", "-f", help="Target test framework (pytest, jest, testez)")] = None,
+    output_file: Annotated[Path | None, typer.Option("--output-file", "-o", help="Write generated test suite to file")] = None,
+    path: Annotated[Path | None, typer.Option("--path", "-p", help="Repository path")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Generate production-ready test scaffolding with fixtures, dependency mocks, and boundary test cases."""
+    from codegraph.test_gen import generate_test_scaffolding
+
+    repo = _resolve_repo(path, repository)
+    indexer = _indexer(repo)
+
+    with indexer.session() as con:
+        scaffold = generate_test_scaffolding(con, target=target, repository=repo, framework=framework)
+
+    if output_file:
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file.write_text(scaffold.test_code, encoding="utf-8")
+        cli_echo(f"Wrote generated test scaffold to {output_file}")
+
+    if json_output:
+        cli_echo(json.dumps(scaffold.as_dict(), indent=2), json_mode=True)
+    elif not output_file:
+        cli_echo(f"Generated {scaffold.framework} Test Scaffold for '{scaffold.target_symbol}':")
+        cli_echo(f"Target Source File:  {scaffold.target_file}")
+        cli_echo(f"SuggestedTest File:  {scaffold.suggested_test_file}")
+        if scaffold.mock_requirements:
+            cli_echo("\nDetected Mock Requirements:")
+            for m in scaffold.mock_requirements:
+                cli_echo(f"  - [{m.mock_type}] {m.target}: {m.description}")
+        cli_echo("\n--- Generated Test Code ---")
+        cli_echo(scaffold.test_code)
+
+
+@app.command("pr-review")
+def pr_review_cmd(
+    base: Annotated[str, typer.Argument(help="Base Git branch/commit (default: main)")] = "main",
+    head: Annotated[str, typer.Argument(help="Head Git branch/commit (default: HEAD)")] = "HEAD",
+    path: Annotated[Path | None, typer.Option("--path", "-p", help="Repository path")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    output_file: Annotated[Path | None, typer.Option("--output-file", "-o", help="Write markdown review to file")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Generate comprehensive semantic PR review evaluating structural diffs, contract breaks, affected routes, and test coverage."""
+    from codegraph.pr_review import generate_pr_review
+
+    repo = _resolve_repo(path, repository)
+    indexer = _indexer(repo)
+
+    with indexer.session() as con:
+        rep = generate_pr_review(repo, base_ref=base, head_ref=head, con=con)
+
+    if output_file:
+        output_file.write_text(rep.markdown_report, encoding="utf-8")
+
+    if json_output:
+        cli_echo(json.dumps(rep.as_dict(), indent=2), json_mode=True)
+    else:
+        cli_echo(rep.markdown_report)
+
+
+security_app = typer.Typer(no_args_is_help=True, help="Security SAST taint tracking and vulnerability audit.")
+app.add_typer(security_app, name="security")
+
+
+@security_app.command("audit")
+def security_audit_cmd(
+    entrypoint: Annotated[str | None, typer.Option("--entrypoint", "-e", help="Optional entrypoint symbol or handler")] = None,
+    cwe: Annotated[str | None, typer.Option("--cwe", help="Filter by CWE identifier (e.g. CWE-89, CWE-78, CWE-22, CWE-918, CWE-502)")] = None,
+    max_depth: Annotated[int, typer.Option("--max-depth", help="Maximum AST traversal depth")] = 12,
+    sarif: Annotated[bool, typer.Option("--sarif", help="Output OASIS SARIF 2.1.0 format for GitHub Code Scanning")] = False,
+    sarif_output: Annotated[Path | None, typer.Option("--sarif-output", help="Write SARIF 2.1.0 JSON report to file")] = None,
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Analyze source-to-sink dataflow taint paths for injection and security vulnerabilities."""
+    from codegraph.security.taint import audit_repository_taint
+
+    repo = _resolve_repo(path, repository)
+    indexer = _indexer(repo)
+
+    with indexer.session() as con:
+        rep = audit_repository_taint(repo, con=con, entrypoint_symbol=entrypoint, filter_cwe=cwe, max_depth=max_depth)
+
+    if sarif_output:
+        sarif_data = rep.to_sarif()
+        sarif_output.write_text(json.dumps(sarif_data, indent=2), encoding="utf-8")
+        if not json_output and not sarif:
+            cli_echo(f"Exported SARIF 2.1.0 report with {rep.total_vulnerabilities} findings to {sarif_output}")
+
+    if sarif:
+        cli_echo(json.dumps(rep.to_sarif(), indent=2), json_mode=True)
+    elif json_output:
+        cli_echo(json.dumps(rep.as_dict(), indent=2), json_mode=True)
+    else:
+        cli_echo(f"Security SAST Taint Audit for {repo.name}:")
+        cli_echo(f"  Total Vulnerabilities: {rep.total_vulnerabilities}")
+        cli_echo(f"  Critical: {rep.critical_count} | High: {rep.high_count} | Medium: {rep.medium_count} | Low: {rep.low_count}")
+        for v in rep.vulnerabilities:
+            cli_echo(f"\n  • [{v.severity.value}] {v.cwe_id}: {v.vulnerability_type}")
+            cli_echo(f"    Source: {v.source_expr} ({v.file_path}:{v.source_line})")
+            cli_echo(f"    Sink:   {v.sink_expr} ({v.file_path}:{v.sink_line})")
+            cli_echo(f"    Remediation: {v.remediation}")
+
+
+@app.command("repair")
+def repair_cmd(
+    quick: Annotated[bool, typer.Option("--quick", help="Run quick check only without deep FTS & orphaned FK cleanup")] = False,
+    vacuum: Annotated[bool, typer.Option("--vacuum", help="Run SQLite VACUUM to defragment index pages")] = False,
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Perform automated self-healing, integrity check, dangling FK pruning, FTS rebuild, and WAL checkpointing."""
+    from codegraph.repair import repair_repository_index
+
+    repo = _resolve_repo(path, repository)
+    rep = repair_repository_index(repo, deep=not quick, vacuum=vacuum)
+
+    if json_output:
+        cli_echo(json.dumps(rep.as_dict(), indent=2), json_mode=True)
+    else:
+        cli_echo(f"Database Index Self-Healing for {repo.name}: Status: {rep.status}")
+        cli_echo(f"  Integrity Check: {'PASSED' if rep.integrity_check_passed else 'FAILED'}")
+        cli_echo(f"  FTS5 Rebuilt:    {rep.fts_rebuilt}")
+        cli_echo(f"  WAL Checkpoint:  {rep.wal_checkpointed}")
+        cli_echo(f"  Stale Locks:     {rep.stale_locks_cleared}")
+        if rep.actions_taken:
+            cli_echo("  Actions Taken:")
+            for act in rep.actions_taken:
+                cli_echo(f"    - {act}")
+        if rep.issues_found:
+            cli_echo("  Issues Found:")
+            for issue in rep.issues_found:
+                cli_echo(f"    ! {issue}")
+
+
+lsp_bridge_app = typer.Typer(no_args_is_help=True, help="Language Server Protocol (LSP) diagnostics bridge.")
+app.add_typer(lsp_bridge_app, name="lsp-bridge")
+
+
+@lsp_bridge_app.command("status")
+def lsp_status_cmd(
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Discover available Language Server Protocol (LSP) daemons on host system."""
+    from codegraph.lsp_bridge.bridge import detect_lsp_servers
+
+    repo = _resolve_repo(path, repository)
+    servers = detect_lsp_servers(repo)
+    if json_output:
+        cli_echo(json.dumps(servers, indent=2), json_mode=True)
+    else:
+        cli_echo(f"Discovered LSP Language Servers for {repo.name}:")
+        if not servers:
+            cli_echo("  No language servers found in PATH (pyright-langserver, gopls, rust-analyzer, clangd).")
+        for lang, bin_path in servers.items():
+            cli_echo(f"  • {lang}: {bin_path}")
+
+
+@lsp_bridge_app.command("diagnostics")
+def lsp_diagnostics_cmd(
+    file: Annotated[str | None, typer.Option("--file", "-f", help="Specific file to query diagnostics for")] = None,
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Collect live compiler diagnostics and type errors from Language Server Protocol daemons."""
+    from codegraph.lsp_bridge.bridge import collect_lsp_diagnostics
+
+    repo = _resolve_repo(path, repository)
+    rep = collect_lsp_diagnostics(repo, file_path=file)
+
+    if json_output:
+        cli_echo(json.dumps(rep.as_dict(), indent=2), json_mode=True)
+    else:
+        cli_echo(f"LSP Diagnostics for {repo.name} [Status: {rep.status}]:")
+        cli_echo(f"  Total Diagnostics: {rep.total_diagnostics} (Errors: {rep.error_count}, Warnings: {rep.warning_count})")
+        for d in rep.diagnostics:
+            cli_echo(f"  • [{d.severity.value}] {d.file_path}:{d.line}:{d.column} - {d.message} ({d.source})")
+
+
+swarm_app = typer.Typer(no_args_is_help=True, help="Multi-agent swarm coordination and file lease management.")
+app.add_typer(swarm_app, name="swarm")
+
+
+@swarm_app.command("status")
+def swarm_status_cmd(
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Display active AI coding agent sessions, leased files, and semantic conflicts."""
+    from codegraph.multi_agent.coordinator import MultiAgentCoordinator
+
+    repo = _resolve_repo(path, repository)
+    coord = MultiAgentCoordinator(repo)
+    rep = coord.get_status_report()
+
+    if json_output:
+        cli_echo(json.dumps(rep.as_dict(), indent=2), json_mode=True)
+    else:
+        cli_echo(f"Multi-Agent Swarm Status for {repo.name}:")
+        cli_echo(f"  Active Agents: {rep.total_agents} | Active Leases: {rep.active_leases_count} | Conflicts: {rep.conflicts_count}")
+        for a in rep.agents:
+            cli_echo(f"  • Agent [{a.agent_id}] '{a.name}': {a.task_description}")
+        for lease in rep.leases:
+            cli_echo(f"  • Lease: {lease.file_path} held by {lease.agent_id} ({lease.lease_type})")
+        for c in rep.conflicts:
+            cli_echo(f"  ! CONFLICT: {c.file_path} - {c.reason}")
+
+
+@swarm_app.command("claim")
+def swarm_claim_cmd(
+    agent_id: Annotated[str, typer.Option("--agent-id", "-a", help="Agent identifier")] = "agent-1",
+    file: Annotated[str, typer.Argument(help="File path to lease")] = "",
+    shared: Annotated[bool, typer.Option("--shared", help="Claim shared read lease instead of exclusive write")] = False,
+    ttl: Annotated[float, typer.Option("--ttl", help="Lease TTL in seconds")] = 60.0,
+    path: Annotated[Path | None, typer.Option("--path", "-p", help="Repository path")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Claim a lease lock on a file for an AI agent."""
+    from codegraph.multi_agent.coordinator import MultiAgentCoordinator
+
+    repo = _resolve_repo(path, repository)
+    coord = MultiAgentCoordinator(repo)
+    lease_type = "SHARED_READ" if shared else "EXCLUSIVE_WRITE"
+    ok, msg = coord.claim_lease(agent_id=agent_id, file_path=file, lease_type=lease_type, ttl_seconds=ttl)
+
+    if json_output:
+        cli_echo(json.dumps({"success": ok, "message": msg, "file": file, "agent_id": agent_id}, indent=2), json_mode=True)
+    else:
+        cli_echo(f"{'SUCCESS' if ok else 'FAILED'}: {msg}")
+
+
+@app.command("lint-arch")
+def lint_arch_cmd(
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Enforce declarative architectural invariants and layer boundary rules."""
+    from codegraph.architecture_rules import evaluate_architecture_rules
+
+    repo = _resolve_repo(path, repository)
+    indexer = _indexer(repo)
+    with indexer.session() as con:
+        rep = evaluate_architecture_rules(repo, con)
+
+    if json_output:
+        cli_echo(json.dumps(rep.as_dict(), indent=2), json_mode=True)
+    else:
+        cli_echo(f"Architecture Rule Check for {repo.name}: Status: {rep.status}")
+        cli_echo(f"  Rules Checked: {rep.total_rules_checked} | Violations: {rep.violations_count}")
+        for v in rep.violations:
+            cli_echo(f"  • [{v.severity}] {v.source_file}:{v.line} -> {v.target_entity} ({v.rule_name})")
+            cli_echo(f"    Message: {v.message}")
+
+
+@app.command("reachability")
+def reachability_cmd(
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Perform DI-aware root-to-leaf reachability analysis and dead code elimination."""
+    from codegraph.reachability import compute_di_aware_reachability
+
+    repo = _resolve_repo(path, repository)
+    indexer = _indexer(repo)
+    with indexer.session() as con:
+        rep = compute_di_aware_reachability(repo, con)
+
+    if json_output:
+        cli_echo(json.dumps(rep.as_dict(), indent=2), json_mode=True)
+    else:
+        cli_echo(f"DI-Aware Reachability & Dead Code for {repo.name}:")
+        cli_echo(f"  Total Symbols: {rep.total_symbols} | Reachable: {rep.reachable_count} | Unreachable: {rep.unreachable_count} ({rep.dead_code_percentage:.1f}%)")
+        cli_echo(f"  Root Entrypoints: {rep.root_entrypoints_count}")
+        for s in rep.unreachable_symbols[:20]:
+            cli_echo(f"  • [{s.kind}] {s.name} ({s.file_path}:{s.line}) [CONFIDENCE: {s.confidence}]")
+
+
+@app.command("changelog")
+def changelog_cmd(
+    base: Annotated[str, typer.Option("--base", "-b", help="Base Git revision")] = "HEAD~1",
+    head: Annotated[str, typer.Option("--head", "-h", help="Head Git revision")] = "HEAD",
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Synthesize human-readable release changelog and breaking change report from AST diffs."""
+    from codegraph.changelog import generate_semantic_changelog
+
+    repo = _resolve_repo(path, repository)
+    rep = generate_semantic_changelog(repo, base_ref=base, head_ref=head)
+
+    if json_output:
+        cli_echo(json.dumps(rep.as_dict(), indent=2), json_mode=True)
+    else:
+        cli_echo(rep.markdown_changelog)
+
+
+@security_app.command("supply-chain")
+def security_supply_chain_cmd(
+    package: Annotated[str | None, typer.Option("--package", "-p", help="Filter by specific package name")] = None,
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Inspect dependency manifests and trace internal call site reachability for packages."""
+    from codegraph.security.supply_chain import analyze_supply_chain
+
+    repo = _resolve_repo(path, repository)
+    indexer = _indexer(repo)
+    with indexer.session() as con:
+        rep = analyze_supply_chain(repo, con=con, target_package=package)
+
+    if json_output:
+        cli_echo(json.dumps(rep.as_dict(), indent=2), json_mode=True)
+    else:
+        cli_echo(f"Dependency Supply Chain Reachability for {repo.name}:")
+        cli_echo(f"  Total Dependencies: {rep.total_dependencies} | Actively Imported: {rep.actively_imported_count} | Call Sites: {rep.total_call_sites}")
+        cli_echo(f"  Manifests: {', '.join(rep.manifests_found)}")
+        for pkg in rep.packages[:25]:
+            status_str = f"IMPORTED ({pkg.call_sites_count} call sites)" if pkg.is_actively_imported else "UNINVOKED"
+            cli_echo(f"  • {pkg.name} ({pkg.version_spec}) [{pkg.manifest_file}]: {status_str}")
+
+
 @app.command("check-freshness")
 def check_freshness_cli_cmd(
     task: Annotated[str, typer.Argument(help="Task prompt to verify context freshness for")] = "",

@@ -237,10 +237,10 @@ class RepositoryWatcher:
     def start(self) -> bool:
         """Start filesystem observation in a background thread."""
         try:
-            from watchdog.events import (  # type: ignore[import-not-found]
-                FileSystemEventHandler,  # type: ignore[import-not-found,unused-ignore]
+            from watchdog.events import (
+                FileSystemEventHandler,
             )
-            from watchdog.observers import Observer  # type: ignore[import-not-found,unused-ignore]
+            from watchdog.observers import Observer
 
             class _Handler(FileSystemEventHandler):  # type: ignore[misc]
                 def __init__(self, watcher: RepositoryWatcher) -> None:

@@ -74,17 +74,31 @@ def join_route_prefixes(*parts: str) -> str:
       join_route_prefixes("/api", "") -> "/api"
       join_route_prefixes("/", "/") -> "/"
     """
-    cleaned: list[str] = []
+    tokens: list[str] = []
     for part in parts:
         p = part.strip()
         if not p or p == "/":
             continue
-        p = p.strip("/")
-        if p:
-            cleaned.append(p)
-    if not cleaned:
+        sub_tokens = [tok for tok in p.strip("/").split("/") if tok]
+        if not sub_tokens:
+            continue
+        if not tokens:
+            tokens.extend(sub_tokens)
+            continue
+
+        # Find maximum overlap between suffix of tokens and prefix of sub_tokens
+        max_overlap = 0
+        max_k = min(len(tokens), len(sub_tokens))
+        for k in range(max_k, 0, -1):
+            if tokens[-k:] == sub_tokens[:k]:
+                max_overlap = k
+                break
+
+        tokens.extend(sub_tokens[max_overlap:])
+
+    if not tokens:
         return "/"
-    return "/" + "/".join(cleaned)
+    return "/" + "/".join(tokens)
 
 
 @dataclass(frozen=True)
@@ -851,6 +865,8 @@ def analyze_js_ts_line(
     file_path: str,
     module: str,
     imports_modules: set[str],
+    all_lines: list[str] | None = None,
+    line_idx: int = 0,
 ) -> list[RouteDetection]:
     """Analyze a single JS/TS line during single-pass scan for Express and Next.js routes."""
     routes: list[RouteDetection] = []
@@ -890,6 +906,47 @@ def analyze_js_ts_line(
                 router_name=router_obj,
             )
         )
+
+    # 1b. Multi-line Express route registration (e.g. router.patch(\n  "/:id", ...))
+    if not routes and all_lines:
+        m_start = re.search(r"\b([A-Za-z_$][\w$]*)\.(get|post|put|delete|patch|options|head|all)\s*\(", line, re.IGNORECASE)
+        if m_start:
+            router_obj = m_start.group(1)
+            if router_obj.lower() in ("app", "router") or router_obj.lower().endswith("router") or router_obj.lower().endswith("routes"):
+                combined_expr = line[m_start.start():]
+                for next_l in all_lines[line_idx + 1:min(len(all_lines), line_idx + 15)]:
+                    combined_expr += " " + next_l.strip()
+                    if ")" in next_l:
+                        break
+                for m in _EXPRESS_CALL_RE.finditer(combined_expr):
+                    method = m.group(2).upper()
+                    if method == "ALL":
+                        method = "ANY"
+                    route_path = m.group(3)
+                    raw_args = m.group(4)
+                    handler_name, handler_expr, middlewares = _resolve_express_handler_and_middleware(raw_args, route_path)
+                    handler_canon = f"{module}.{handler_expr}"
+                    norm = normalize_route_path(route_path, "express")
+                    mw_str = f" (middleware: {', '.join(middlewares)})" if middlewares else ""
+
+                    routes.append(
+                        RouteDetection(
+                            framework="express",
+                            http_method=method,
+                            route_path=route_path,
+                            normalized_route=norm,
+                            handler_name=handler_name,
+                            handler_canonical_id=handler_canon,
+                            file_path=file_path,
+                            line=lineno,
+                            column=m_start.start(),
+                            confidence="HIGH",
+                            resolution_status="RESOLVED",
+                            evidence=f"Express route registration {router_obj}.{method.lower()}('{route_path}', ...){mw_str}",
+                            module=module,
+                            router_name=router_obj,
+                        )
+                    )
 
     # 2. Next.js App Router route handlers (e.g. app/api/login/route.ts)
     norm_path = file_path.replace("\\", "/")
