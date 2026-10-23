@@ -19,8 +19,10 @@ def test_file_debouncer_coalesces_rapid_events() -> None:
         debouncer.record_change("src/app.py")
         debouncer.record_change("src/utils.py")
 
-        # Wait for debounce window to fire
-        time.sleep(0.15)
+        # Wait for debounce window to fire (resilient polling for CI runners)
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline and not triggered_batches:
+            time.sleep(0.02)
 
         assert len(triggered_batches) == 1
         assert triggered_batches[0] == {"src/app.py", "src/utils.py"}

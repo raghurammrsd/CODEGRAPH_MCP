@@ -42,8 +42,10 @@ def test_debounced_index_worker_coalescing():
         # Before 100ms expires, no batch should have completed yet
         assert len(batches_run) == 0
 
-        # Wait for debounce window to settle
-        time.sleep(0.2)
+        # Wait for debounce window to settle (resilient polling for CI runners)
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline and not batches_run:
+            time.sleep(0.02)
 
         # Exactly 1 batch run!
         assert len(batches_run) == 1

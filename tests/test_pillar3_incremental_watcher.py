@@ -211,13 +211,18 @@ def test_debounced_worker_coalesces_bursts(tmp_path: Path) -> None:
     for _ in range(5):
         worker.record_change("app/models.py")
 
-    # Wait for debounce window to fire
-    time.sleep(0.18)
+    # Wait for debounce window to fire (resilient polling for busy CI runners)
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline and not batches:
+        time.sleep(0.02)
 
-    assert len(batches) == 1
-    assert worker.stats.batches_processed == 1
-    assert worker.stats.events_received == 5
-    assert worker.stats.files_reindexed >= 1
+    try:
+        assert len(batches) == 1
+        assert worker.stats.batches_processed == 1
+        assert worker.stats.events_received == 5
+        assert worker.stats.files_reindexed >= 1
+    finally:
+        worker.cancel()
 
 
 def test_repository_watcher_trigger_sync(tmp_path: Path) -> None:
