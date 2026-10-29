@@ -798,16 +798,16 @@ def _get_html_dashboard() -> str:
   <!-- TOP HEADER NAV -->
   <header>
     <div class="brand-container">
-      <div class="brand-avatar">C</div>
+      <div class="brand-avatar">R</div>
       <div class="brand-text">
-        <span class="brand-title">CODEGRAPH <span class="brand-title-dot"></span></span>
-        <span class="brand-sub">AI Systems Architect</span>
+        <span class="brand-title">RAGHURAM <span class="brand-title-dot"></span></span>
+        <span class="brand-sub">AI Systems Architect • CodeGraph</span>
       </div>
     </div>
 
     <nav>
-      <button class="nav-btn active" onclick="switchTab('graph')"><span class="num">01</span> GRAPH</button>
-      <button class="nav-btn" onclick="switchTab('routes')"><span class="num">02</span> ROUTES & DRIFT</button>
+      <button class="nav-btn active" onclick="switchTab('graph')"><span class="num">01</span> ARCHITECTURE</button>
+      <button class="nav-btn" onclick="switchTab('routes')"><span class="num">02</span> DRIFT MATRIX</button>
       <button class="nav-btn" onclick="switchTab('impact')"><span class="num">03</span> BLAST RADIUS</button>
       <button class="nav-btn" onclick="switchTab('lineage')"><span class="num">04</span> DB LINEAGE</button>
       <button class="nav-btn" onclick="switchTab('benchmarks')"><span class="num">05</span> BENCHMARKS</button>
@@ -822,8 +822,8 @@ def _get_html_dashboard() -> str:
       <div class="live-pill" id="clock-pill">
         <span id="live-clock">00:00:00</span>
       </div>
-      <button class="btn-theme" onclick="toggleTheme()">FX / THEME</button>
-      <a class="btn-pypi" href="https://pypi.org/project/codegraph-engine/3.0.1/" target="_blank" rel="noopener">PYPI v3.0.1 ↗</a>
+      <button class="btn-theme" onclick="toggleTheme()">FX</button>
+      <a class="btn-pypi" href="https://pypi.org/project/codegraph-engine/3.0.1/" target="_blank" rel="noopener">CODEGRAPH 3.0.1 ↗</a>
     </div>
   </header>
 
@@ -848,7 +848,7 @@ def _get_html_dashboard() -> str:
         <!-- VIEW MODE TOGGLE -->
         <div class="hud-view-toggle">
           <button class="btn-view-mode active" id="btn-mode-dag" onclick="setViewMode('pipeline')">PIPELINE FLOW &rarr;</button>
-          <button class="btn-view-mode" id="btn-mode-orbital" onclick="setViewMode('galaxy')">CLUSTER GALAXY</button>
+          <button class="btn-view-mode" id="btn-mode-orbital" onclick="setViewMode('radial')">ORBITAL RINGS</button>
         </div>
 
         <div class="hud-edge-toggles">
@@ -1389,11 +1389,11 @@ def _get_html_dashboard() -> str:
     }
 
     // ====================================================================
-    // CRYSTAL-CLEAR ARCHITECTURE GRAPH: PIPELINE DAG + ANTI-COLLISION
+    // STABLE ARCHITECTURE GRAPH: PIPELINE DAG + RADIAL (ZERO AUTO-ATTACH)
     // ====================================================================
     let nodes = [];
     let edges = [];
-    let viewMode = 'pipeline'; // 'pipeline' (L -> R) or 'galaxy' (orbital)
+    let viewMode = 'pipeline'; // 'pipeline' (L -> R) or 'radial' (stable circle)
     let currentDensity = 28;
     let zoomLevel = 1.0;
     let panX = 0;
@@ -1401,6 +1401,7 @@ def _get_html_dashboard() -> str:
     let isPanning = false;
     let startPanX = 0;
     let startPanY = 0;
+    let draggedNodeIndex = -1;
     let searchQuery = '';
     let selectedNodeIndex = -1;
     let hoveredNodeIndex = -1;
@@ -1417,7 +1418,7 @@ def _get_html_dashboard() -> str:
     function setViewMode(mode) {
       viewMode = mode;
       document.getElementById('btn-mode-dag').classList.toggle('active', mode === 'pipeline');
-      document.getElementById('btn-mode-orbital').classList.toggle('active', mode === 'galaxy');
+      document.getElementById('btn-mode-orbital').classList.toggle('active', mode === 'radial');
       applyLayoutPositions();
     }
 
@@ -1512,27 +1513,28 @@ def _get_html_dashboard() -> str:
     function getEdgeCategory(rel) {
       if (rel === 'CALLS') return 'CALLS';
       if (rel.includes('IMPORT') || rel.includes('EXPORT')) return 'IMPORTS';
-      if (rel.includes('MOUNT') || rel.includes('ROUTE') || rel.includes('DISPATCH')) return 'MOUNTS';
-      if (rel.includes('TABLE') || rel.includes('COLUMN') || rel.includes('PERSISTENCE')) return 'DATABASE';
+      if (rel.includes('MOUNT') || rel.includes('ROUTE') || rel.includes('DISPATCH') || rel.includes('COMMAND') || rel.includes('SIGNAL') || rel.includes('TESTS')) return 'MOUNTS';
+      if (rel.includes('TABLE') || rel.includes('COLUMN') || rel.includes('PERSISTENCE') || rel.includes('MIGRATE')) return 'DATABASE';
       return 'DEFINES';
     }
 
     function assignArchitectureLayer(n) {
       const p = (n.path || '').toLowerCase();
       const name = (n.name || '').toLowerCase();
+      const kind = (n.kind || '').toUpperCase();
 
-      if (p.includes('cli') || p.includes('mcp/server') || name.includes('app') || name.includes('main')) {
+      if (kind.includes('TABLE') || name.includes('table') || p.includes('schema') || p.includes('db')) {
+        n.layer = 3;
+        n.layerName = 'Storage & Database';
+      } else if (p.includes('cli') || p.includes('mcp') || p.includes('route') || p.includes('server') || kind.includes('HANDLER') || name.includes('main')) {
         n.layer = 0;
         n.layerName = 'CLI & Protocol Entrypoints';
-      } else if (p.includes('indexer') || p.includes('watcher') || p.includes('impact') || p.includes('refactor')) {
+      } else if (p.includes('indexer') || p.includes('watcher') || p.includes('impact') || p.includes('refactor') || p.includes('governor') || p.includes('traversal') || p.includes('context') || p.includes('resolver')) {
         n.layer = 1;
         n.layerName = 'Core Intelligence Engines';
-      } else if (p.includes('parser') || p.includes('tree') || p.includes('drift') || p.includes('search')) {
-        n.layer = 2;
-        n.layerName = 'AST & Syntactic Parsers';
       } else {
-        n.layer = 3;
-        n.layerName = 'Storage, Cache & WAL';
+        n.layer = 2;
+        n.layerName = 'Parsers, AST & Resolvers';
       }
     }
 
@@ -1542,40 +1544,65 @@ def _get_html_dashboard() -> str:
       const h = canvas.height || 700;
 
       if (viewMode === 'pipeline') {
-        // CLEAN LEFT-TO-RIGHT SWIMLANES (ZERO CROSSING CONFUSION!)
+        // 4 CLEAN SWIMLANES (LEFT TO RIGHT, STAGGERED SUB-COLUMNS FOR ZERO OVERLAP)
         const layers = [[], [], [], []];
         nodes.forEach(n => {
           assignArchitectureLayer(n);
           layers[n.layer].push(n);
         });
 
-        const colWidth = (w - 240) / 4;
-        const startX = -w / 2 + 160;
+        const colWidth = (w - 220) / 4;
+        const startX = -w / 2 + 150;
 
         layers.forEach((layerNodes, lIdx) => {
           const colX = startX + lIdx * colWidth;
           const count = layerNodes.length;
-          const spacing = Math.min(65, (h - 160) / Math.max(1, count));
-          const startY = -(count * spacing) / 2;
+          const useStagger = count > 6;
+          const effectiveCount = useStagger ? Math.ceil(count / 2) : count;
+          const spacing = Math.min(65, Math.max(40, (h - 180) / Math.max(1, effectiveCount)));
+          const startY = -(effectiveCount * spacing) / 2;
 
           layerNodes.forEach((n, idx) => {
-            n.targetX = colX;
-            n.targetY = startY + idx * spacing + (spacing / 2);
-            n.x = n.targetX;
-            n.y = n.targetY;
-            n.vx = 0; n.vy = 0;
+            let xOffset = 0;
+            let rowIdx = idx;
+            if (useStagger) {
+              xOffset = (idx % 2 === 0) ? -45 : 45;
+              rowIdx = Math.floor(idx / 2);
+            }
+            n.x = colX + xOffset;
+            n.y = startY + rowIdx * spacing + (spacing / 2);
+            n.vx = 0;
+            n.vy = 0;
           });
         });
       } else {
-        // GALAXY ORBITAL CLUSTERS
-        nodes.forEach((n, i) => {
-          const theta = (i / nodes.length) * 2 * Math.PI;
-          const rad = 220 + (i % 3) * 60;
-          n.targetX = Math.cos(theta) * rad;
-          n.targetY = Math.sin(theta) * rad;
-          n.x = n.targetX;
-          n.y = n.targetY;
-          n.vx = 0; n.vy = 0;
+        // 3 CONCENTRIC ORBITAL RINGS: ZERO PHYSICS, STABLE POSITIONS
+        const ring1 = []; // Inner: Core Engines
+        const ring2 = []; // Middle: Parsers & Storage
+        const ring3 = []; // Outer: Entrypoints & System
+
+        nodes.forEach(n => {
+          assignArchitectureLayer(n);
+          if (n.layer === 1) ring1.push(n);
+          else if (n.layer === 2 || n.layer === 3) ring2.push(n);
+          else ring3.push(n);
+        });
+
+        const rings = [
+          { list: ring1, radius: Math.min(w, h) * 0.18 },
+          { list: ring2, radius: Math.min(w, h) * 0.32 },
+          { list: ring3, radius: Math.min(w, h) * 0.44 }
+        ];
+
+        rings.forEach(ring => {
+          const count = ring.list.length;
+          ring.list.forEach((n, i) => {
+            const theta = (i / Math.max(1, count)) * 2 * Math.PI - (Math.PI / 2);
+            n.x = Math.cos(theta) * ring.radius;
+            n.y = Math.sin(theta) * ring.radius;
+            n.vx = 0;
+            n.vy = 0;
+          });
         });
       }
     }
@@ -1676,17 +1703,17 @@ def _get_html_dashboard() -> str:
             '01 · ENTRYPOINTS',
             '02 · CORE ENGINES',
             '03 · PARSERS & AST',
-            '04 · STORAGE & WAL'
+            '04 · STORAGE & DATABASE'
           ];
 
           headers.forEach((hName, idx) => {
             const colX = startX + idx * colWidth;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
             ctx.fillRect(colX - 80, -canvas.height / 2 + 30, 160, canvas.height - 60);
 
             ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
             ctx.font = '10px "JetBrains Mono", monospace';
-            ctx.fillText(hName, colX - 50, -canvas.height / 2 + 50);
+            ctx.fillText(hName, colX - 60, -canvas.height / 2 + 50);
           });
         }
 
@@ -1703,7 +1730,7 @@ def _get_html_dashboard() -> str:
 
           const isConnectedToFocus = (e.sourceIndex === focusIdx || e.targetIndex === focusIdx);
 
-          let alpha = 0.25;
+          let alpha = 0.28;
           let width = 1.0;
           let edgeColor = '#FF5400';
 
@@ -1809,16 +1836,7 @@ def _get_html_dashboard() -> str:
           ctx.globalAlpha = 1.0;
         });
 
-        // Soft physics relaxation in galaxy mode
-        if (viewMode === 'galaxy') {
-          nodes.forEach(n => {
-            n.vx -= n.x * 0.0003;
-            n.vy -= n.y * 0.0003;
-            n.x += n.vx; n.y += n.vy;
-            n.vx *= 0.88; n.vy *= 0.88;
-          });
-        }
-
+        // ZERO UNINTENDED MOVEMENT: NODES REMAIN FIRMLY IN PLACE!
         ctx.restore();
       }
 
@@ -1827,28 +1845,41 @@ def _get_html_dashboard() -> str:
       }, 30);
     }
 
-    // INTERACTION: PAN, ZOOM, AND CLICK SELECTION
+    // INTERACTION: PAN, ZOOM, AND INDIVIDUAL NODE DRAGGING
     const canvasElem = document.getElementById('graph-canvas');
 
-    // Pan Handlers
     canvasElem.addEventListener('mousedown', e => {
-      isPanning = true;
-      startPanX = e.clientX - panX;
-      startPanY = e.clientY - panY;
+      const rect = canvasElem.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left - (canvasElem.width / 2 + panX)) / zoomLevel;
+      const mouseY = (e.clientY - rect.top - (canvasElem.height / 2 + panY)) / zoomLevel;
+
+      const hit = nodes.findIndex(n => Math.hypot(n.x - mouseX, n.y - mouseY) < 16);
+      if (hit !== -1) {
+        draggedNodeIndex = hit;
+      } else {
+        isPanning = true;
+        startPanX = e.clientX - panX;
+        startPanY = e.clientY - panY;
+      }
     });
 
-    window.addEventListener('mouseup', () => { isPanning = false; });
+    window.addEventListener('mouseup', () => {
+      isPanning = false;
+      draggedNodeIndex = -1;
+    });
 
     canvasElem.addEventListener('mousemove', e => {
-      if (isPanning) {
+      const rect = canvasElem.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left - (canvasElem.width / 2 + panX)) / zoomLevel;
+      const mouseY = (e.clientY - rect.top - (canvasElem.height / 2 + panY)) / zoomLevel;
+
+      if (draggedNodeIndex !== -1) {
+        nodes[draggedNodeIndex].x = mouseX;
+        nodes[draggedNodeIndex].y = mouseY;
+      } else if (isPanning) {
         panX = e.clientX - startPanX;
         panY = e.clientY - startPanY;
       } else {
-        // Detect Hover
-        const rect = canvasElem.getBoundingClientRect();
-        const mouseX = (e.clientX - rect.left - (canvasElem.width / 2 + panX)) / zoomLevel;
-        const mouseY = (e.clientY - rect.top - (canvasElem.height / 2 + panY)) / zoomLevel;
-
         const found = nodes.findIndex(n => Math.hypot(n.x - mouseX, n.y - mouseY) < 14);
         hoveredNodeIndex = found;
         canvasElem.style.cursor = found !== -1 ? 'pointer' : (isPanning ? 'grabbing' : 'grab');
@@ -2029,94 +2060,156 @@ class CodeGraphUIRequestHandler(BaseHTTPRequestHandler):
         try:
             query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             density = int(query.get("max_nodes", [28])[0])
-            hub_limit = max(10, density // 2)
 
             with self.indexer.session() as con:
-                # 1. Fetch top central architecture hub symbols
-                top_sym_sql = """
-                SELECT s.id, s.name, s.kind, s.path, s.start_line, s.language, count(e.source) as degree
-                FROM symbols s
-                JOIN graph_edges e ON e.source = s.id
-                WHERE s.name NOT IN ('__init__', '__repr__', '__str__', 'setUp', 'tearDown')
-                GROUP BY s.id
-                ORDER BY degree DESC
-                LIMIT ?
-                """
-                top_syms = con.execute(top_sym_sql, [hub_limit]).fetchall()
-                hub_ids = [str(r["id"]) for r in top_syms]
+                edges_raw: list[tuple[str, str, str]] = []
 
-                # 2. Fetch direct 1-hop callees of these hubs
-                if hub_ids:
-                    placeholders = ",".join("?" for _ in hub_ids)
-                    callee_sql = f"""
-                    SELECT DISTINCT e.target
-                    FROM graph_edges e
-                    WHERE e.source IN ({placeholders})
-                    LIMIT ?
+                # 1. Calls
+                call_limit = max(10, density // 2)
+                call_rows = con.execute(
                     """
-                    callee_rows = con.execute(callee_sql, hub_ids + [density - len(hub_ids)]).fetchall()
-                    callee_ids = [str(r[0]) for r in callee_rows]
-                    combined_ids = list(dict.fromkeys(hub_ids + callee_ids))
-                else:
-                    combined_ids = []
+                    SELECT e.source, e.target, e.relationship FROM graph_edges e
+                    WHERE e.relationship = 'CALLS'
+                      AND e.source NOT LIKE '%test%' AND e.target NOT LIKE '%test%'
+                    LIMIT ?
+                    """,
+                    [call_limit],
+                ).fetchall()
+                edges_raw.extend((str(r[0]), str(r[1]), str(r[2])) for r in call_rows)
+
+                # 2. Imports & Re-exports
+                import_limit = max(4, density // 6)
+                import_rows = con.execute(
+                    """
+                    SELECT e.source, e.target, e.relationship FROM graph_edges e
+                    WHERE e.relationship IN ('IMPORTS', 'REEXPORTS')
+                    LIMIT ?
+                    """,
+                    [import_limit],
+                ).fetchall()
+                edges_raw.extend((str(r[0]), str(r[1]), str(r[2])) for r in import_rows)
+
+                # 3. Routes & Dispatches
+                route_limit = max(4, density // 6)
+                route_rows = con.execute(
+                    """
+                    SELECT e.source, e.target, e.relationship FROM graph_edges e
+                    WHERE e.relationship IN ('COMMAND_HANDLER', 'HANDLES_SIGNAL', 'TRIGGERS_SIGNAL', 'DISPATCHES_TASK')
+                    LIMIT ?
+                    """,
+                    [route_limit],
+                ).fetchall()
+                edges_raw.extend((str(r[0]), str(r[1]), str(r[2])) for r in route_rows)
+
+                # 4. Database Models & Tables
+                db_limit = max(6, density // 5)
+                db_rows = con.execute(
+                    """
+                    SELECT e.source, e.target, e.relationship FROM graph_edges e
+                    WHERE e.relationship IN ('READS_TABLE', 'WRITES_TABLE', 'MIGRATES_TABLE')
+                    LIMIT ?
+                    """,
+                    [db_limit],
+                ).fetchall()
+                edges_raw.extend((str(r[0]), str(r[1]), str(r[2])) for r in db_rows)
+
+                # 5. Classes & Hierarchy (Extends, Defines, Tests)
+                struct_limit = max(6, density // 5)
+                struct_rows = con.execute(
+                    """
+                    SELECT e.source, e.target, e.relationship FROM graph_edges e
+                    WHERE e.relationship IN ('EXTENDS', 'DEFINES', 'TESTS')
+                    LIMIT ?
+                    """,
+                    [struct_limit],
+                ).fetchall()
+                edges_raw.extend((str(r[0]), str(r[1]), str(r[2])) for r in struct_rows)
+
+                all_ids: set[str] = set()
+                for s, t, _ in edges_raw:
+                    all_ids.add(s)
+                    all_ids.add(t)
+
+                sym_dict: dict[str, dict[str, Any]] = {}
+                if all_ids:
+                    id_list = list(all_ids)
+                    for i in range(0, len(id_list), 900):
+                        chunk = id_list[i : i + 900]
+                        ph = ",".join("?" for _ in chunk)
+                        rows = con.execute(
+                            f"SELECT id, name, kind, path, start_line, language FROM symbols WHERE id IN ({ph})",
+                            chunk,
+                        ).fetchall()
+                        for r in rows:
+                            sym_dict[str(r["id"])] = {
+                                "name": str(r["name"]),
+                                "kind": str(r["kind"]).upper(),
+                                "path": str(r["path"]),
+                                "line": int(r["start_line"]),
+                                "language": str(r["language"] or "python"),
+                            }
 
                 node_map: dict[str, int] = {}
                 nodes: list[dict[str, Any]] = []
 
-                if combined_ids:
-                    comb_placeholders = ",".join("?" for _ in combined_ids)
-                    sym_info_sql = f"""
-                    SELECT id, name, kind, path, start_line, language
-                    FROM symbols
-                    WHERE id IN ({comb_placeholders})
-                    """
-                    sym_info_rows = con.execute(sym_info_sql, combined_ids).fetchall()
-                    for idx, r in enumerate(sym_info_rows):
-                        nid = str(r["id"])
-                        node_map[nid] = idx
-                        kind_upper = str(r["kind"]).upper()
-                        color = "#FF5400"
-                        if "CLASS" in kind_upper or "STRUCT" in kind_upper:
-                            color = "#BC8CFF"
-                        elif "ROUTE" in kind_upper:
-                            color = "#2EA043"
-                        elif "TABLE" in kind_upper:
-                            color = "#D29922"
-                        elif "INTERFACE" in kind_upper:
-                            color = "#38BDF8"
+                for nid in all_ids:
+                    if nid in sym_dict:
+                        info = sym_dict[nid]
+                        name = info["name"]
+                        kind = info["kind"]
+                        path_str = info["path"]
+                        line = info["line"]
+                        lang = info["language"]
+                    else:
+                        if nid.startswith("db."):
+                            parts = nid.split(".")
+                            name = parts[-1]
+                            kind = "TABLE"
+                            path_str = f"sqlite://schema/{name}"
+                        elif "/" in nid:
+                            name = nid.split("/")[-1]
+                            kind = "MODULE"
+                            path_str = nid
+                        elif "." in nid:
+                            name = nid.split(".")[-1]
+                            kind = "CLASS"
+                            path_str = f"stdlib/{nid}"
+                        else:
+                            name = nid
+                            kind = "MODULE"
+                            path_str = f"package/{nid}"
+                        line = 1
+                        lang = "system"
 
-                        nodes.append({
-                            "id": nid,
-                            "name": str(r["name"]),
-                            "kind": kind_upper,
-                            "path": str(r["path"]),
-                            "line": int(r["start_line"]),
-                            "language": str(r["language"] or "python"),
-                            "color": color,
+                    color = "#FF5400"
+                    if "CLASS" in kind or "STRUCT" in kind:
+                        color = "#BC8CFF"
+                    elif "TABLE" in kind:
+                        color = "#D29922"
+                    elif "MODULE" in kind or "PACKAGE" in kind:
+                        color = "#38BDF8"
+                    elif "HANDLER" in kind or "SIGNAL" in kind or "ROUTE" in kind:
+                        color = "#2EA043"
+
+                    node_map[nid] = len(nodes)
+                    nodes.append({
+                        "id": nid,
+                        "name": name,
+                        "kind": kind,
+                        "path": path_str,
+                        "line": line,
+                        "language": lang,
+                        "color": color,
+                    })
+
+                edges: list[dict[str, Any]] = []
+                for s, t, rel in edges_raw:
+                    if s in node_map and t in node_map:
+                        edges.append({
+                            "sourceIndex": node_map[s],
+                            "targetIndex": node_map[t],
+                            "relationship": rel,
                         })
-
-                    # 3. Fetch connected edges between all combined nodes
-                    edge_params = combined_ids * 2
-                    edge_sql = f"""
-                    SELECT e.source, e.target, e.relationship
-                    FROM graph_edges e
-                    WHERE e.source IN ({comb_placeholders}) AND e.target IN ({comb_placeholders})
-                    LIMIT 150
-                    """
-                    edge_rows = con.execute(edge_sql, edge_params).fetchall()
-                    edges: list[dict[str, Any]] = []
-
-                    for e in edge_rows:
-                        s_nid = str(e["source"])
-                        t_nid = str(e["target"])
-                        if s_nid in node_map and t_nid in node_map:
-                            edges.append({
-                                "sourceIndex": node_map[s_nid],
-                                "targetIndex": node_map[t_nid],
-                                "relationship": str(e["relationship"]),
-                            })
-                else:
-                    edges = []
 
                 payload = {"nodes": nodes, "edges": edges}
         except Exception:
