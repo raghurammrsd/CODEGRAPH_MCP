@@ -1,7 +1,9 @@
 """Embedded Local Web Dashboard & Knowledge Graph Visualizer for CodeGraph.
 
 Serves an interactive web application on localhost:
-- Force-Directed Knowledge Graph Visualizer (Clustered Spring Physics, Directed Flow Arrows, Relationship Filters)
+- Architecture Pipeline Flow (Left-to-Right Swimlane View & Clustered Galaxy)
+- Anti-Collision Text Labels & Dynamic Zoom/Pan Navigation
+- Isolated Call Chain Inspector (Direct Callers & Callees Spotlight)
 - Full-Stack Route & API Drift Inspector
 - PR Blast Radius & Risk Assessment
 - Database Lineage & Model Matrix
@@ -64,7 +66,7 @@ def _get_html_dashboard() -> str:
       --badge-purple-text: #BC8CFF;
       --badge-cyan-bg: rgba(56, 189, 248, 0.15);
       --badge-cyan-text: #38BDF8;
-      --canvas-bg: #141619;
+      --canvas-bg: #111316;
     }
 
     [data-theme="obsidian"] {
@@ -408,15 +410,19 @@ def _get_html_dashboard() -> str:
       height: 100%;
       background: var(--canvas-bg);
       display: block;
+      cursor: grab;
+    }
+    #graph-canvas:active {
+      cursor: grabbing;
     }
 
-    /* REDESIGNED GRAPH HUD WITH DIRECT RELATIONSHIP FILTERS */
+    /* FLOATING READABLE GRAPH CONTROL PALETTE */
     .graph-hud {
       position: absolute;
       top: 16px;
       left: 16px;
-      background: rgba(21, 23, 26, 0.92);
-      backdrop-filter: blur(14px);
+      background: rgba(21, 23, 26, 0.94);
+      backdrop-filter: blur(16px);
       border: 1px solid var(--border-card);
       border-radius: 12px;
       padding: 14px 16px;
@@ -424,11 +430,11 @@ def _get_html_dashboard() -> str:
       z-index: 10;
       font-size: 11px;
       font-family: 'JetBrains Mono', monospace;
-      min-width: 260px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      min-width: 250px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
     }
     .graph-hud h4 {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--accent-orange);
       text-transform: uppercase;
       letter-spacing: 0.8px;
@@ -437,11 +443,36 @@ def _get_html_dashboard() -> str:
       justify-content: space-between;
       align-items: center;
     }
+    .hud-view-toggle {
+      display: flex;
+      gap: 4px;
+      background: rgba(0,0,0,0.3);
+      padding: 3px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    .btn-view-mode {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-light-muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-view-mode.active {
+      background: var(--accent-orange);
+      color: #000;
+    }
     .hud-edge-toggles {
       display: flex;
       flex-direction: column;
-      gap: 6px;
-      margin-bottom: 10px;
+      gap: 5px;
+      margin-bottom: 12px;
     }
     .edge-filter-pill {
       display: flex;
@@ -454,6 +485,7 @@ def _get_html_dashboard() -> str:
       cursor: pointer;
       user-select: none;
       transition: all 0.15s;
+      font-size: 10px;
     }
     .edge-filter-pill:hover {
       background: rgba(255, 255, 255, 0.08);
@@ -468,20 +500,45 @@ def _get_html_dashboard() -> str:
       gap: 8px;
     }
     .hud-dot {
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
     }
     .edge-count-badge {
       font-size: 9px;
       opacity: 0.7;
     }
+    .hud-density {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    .density-btn-group {
+      display: flex;
+      gap: 4px;
+    }
+    .btn-density {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-light-muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 3px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .btn-density.active {
+      background: #FFFFFF;
+      color: #000;
+    }
     .hud-actions {
       display: flex;
-      gap: 6px;
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid rgba(255,255,255,0.08);
+      gap: 5px;
+      margin-top: 8px;
     }
     .btn-hud {
       flex: 1;
@@ -491,7 +548,7 @@ def _get_html_dashboard() -> str:
       font-family: 'JetBrains Mono', monospace;
       font-size: 10px;
       font-weight: 600;
-      padding: 6px 10px;
+      padding: 5px 8px;
       border-radius: 6px;
       cursor: pointer;
       transition: all 0.15s;
@@ -503,7 +560,7 @@ def _get_html_dashboard() -> str:
       border-color: var(--accent-orange);
     }
 
-    /* TOP RIGHT SEARCH & STATUS */
+    /* TOP SEARCH & SPOTLIGHT STATUS BANNER */
     .graph-search-box {
       position: absolute;
       top: 16px;
@@ -514,37 +571,53 @@ def _get_html_dashboard() -> str:
       gap: 8px;
     }
     .search-input {
-      background: rgba(21, 23, 26, 0.9);
-      backdrop-filter: blur(12px);
+      background: rgba(21, 23, 26, 0.92);
+      backdrop-filter: blur(14px);
       border: 1px solid var(--border-card);
       border-radius: 999px;
       padding: 8px 18px;
       color: #FFFFFF;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
+      font-size: 11px;
       outline: none;
-      width: 280px;
+      width: 260px;
       transition: width 0.2s, border-color 0.2s;
     }
     .search-input:focus {
       border-color: var(--accent-orange);
-      width: 320px;
+      width: 300px;
     }
-    .btn-clear-focus {
-      background: rgba(120, 20, 32, 0.85);
-      border: 1px solid rgba(255,255,255,0.15);
-      color: #FFF;
-      padding: 8px 14px;
+
+    /* FOCUS BANNER */
+    .focus-banner {
+      position: absolute;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(120, 20, 32, 0.92);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 6px 16px;
       border-radius: 999px;
+      color: #FFFFFF;
       font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
       font-weight: 700;
-      cursor: pointer;
       display: none;
-      transition: all 0.15s;
+      align-items: center;
+      gap: 12px;
+      z-index: 15;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
     }
-    .btn-clear-focus:hover {
-      background: var(--accent-burgundy-hover);
+    .btn-exit-focus {
+      background: #FFFFFF;
+      color: var(--accent-burgundy);
+      border: none;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 10px;
+      cursor: pointer;
     }
 
     /* NODE DETAILS SLIDE-OUT DRAWER WITH CALLERS & CALLEES */
@@ -552,8 +625,8 @@ def _get_html_dashboard() -> str:
       position: absolute;
       bottom: 20px;
       right: 20px;
-      width: 380px;
-      max-height: 480px;
+      width: 360px;
+      max-height: 440px;
       background: rgba(21, 23, 26, 0.96);
       backdrop-filter: blur(16px);
       border: 1px solid var(--border-card-active);
@@ -592,7 +665,7 @@ def _get_html_dashboard() -> str:
       border-top: 1px solid rgba(255,255,255,0.08);
     }
     .drawer-section-title {
-      font-size: 10px;
+      font-size: 9px;
       font-family: 'JetBrains Mono', monospace;
       text-transform: uppercase;
       letter-spacing: 0.8px;
@@ -757,15 +830,27 @@ def _get_html_dashboard() -> str:
   <!-- MAIN BODY -->
   <main>
 
-    <!-- TAB 1: KNOWLEDGE GRAPH WITH REDESIGNED DIRECTED EDGES & RELATIONSHIP FILTERS -->
+    <!-- TAB 1: KNOWLEDGE GRAPH WITH CLEAN LEFT-TO-RIGHT PIPELINE & ANTI-COLLISION LABELS -->
     <div id="graph-pane" class="tab-pane active">
       
-      <!-- HUD WITH INTERACTIVE EDGE FILTERS -->
+      <!-- SPOTLIGHT FOCUS BANNER -->
+      <div id="focus-banner" class="focus-banner">
+        <span id="focus-banner-text">FOCUSING: Indexer</span>
+        <button class="btn-exit-focus" onclick="clearFocus()">EXIT SPOTLIGHT ✕</button>
+      </div>
+
+      <!-- HUD WITH INTERACTIVE CONTROLS -->
       <div class="graph-hud">
         <h4>
-          <span>RELATIONSHIP LAYERS</span>
-          <span style="font-size: 9px; opacity: 0.6;" id="hud-filter-status">ALL ON</span>
+          <span>ARCHITECTURE EXPLORER</span>
         </h4>
+
+        <!-- VIEW MODE TOGGLE -->
+        <div class="hud-view-toggle">
+          <button class="btn-view-mode active" id="btn-mode-dag" onclick="setViewMode('pipeline')">PIPELINE FLOW &rarr;</button>
+          <button class="btn-view-mode" id="btn-mode-orbital" onclick="setViewMode('galaxy')">CLUSTER GALAXY</button>
+        </div>
+
         <div class="hud-edge-toggles">
           <div class="edge-filter-pill active" style="color: var(--accent-orange);" onclick="toggleEdgeFilter('CALLS')">
             <div class="edge-filter-left">
@@ -778,7 +863,7 @@ def _get_html_dashboard() -> str:
           <div class="edge-filter-pill active" style="color: var(--badge-cyan-text);" onclick="toggleEdgeFilter('IMPORTS')">
             <div class="edge-filter-left">
               <div class="hud-dot" style="background: var(--badge-cyan-text);"></div>
-              <span>IMPORTS & EXPORTS</span>
+              <span>IMPORTS & MODULES</span>
             </div>
             <span class="edge-count-badge" id="count-IMPORTS">0</span>
           </div>
@@ -786,7 +871,7 @@ def _get_html_dashboard() -> str:
           <div class="edge-filter-pill active" style="color: var(--badge-green-text);" onclick="toggleEdgeFilter('MOUNTS')">
             <div class="edge-filter-left">
               <div class="hud-dot" style="background: var(--badge-green-text);"></div>
-              <span>ROUTES & DISPATCHES</span>
+              <span>ROUTES & DISPATCH</span>
             </div>
             <span class="edge-count-badge" id="count-MOUNTS">0</span>
           </div>
@@ -794,7 +879,7 @@ def _get_html_dashboard() -> str:
           <div class="edge-filter-pill active" style="color: var(--badge-amber-text);" onclick="toggleEdgeFilter('DATABASE')">
             <div class="edge-filter-left">
               <div class="hud-dot" style="background: var(--badge-amber-text);"></div>
-              <span>DB READERS & WRITERS</span>
+              <span>DATABASE MODELS</span>
             </div>
             <span class="edge-count-badge" id="count-DATABASE">0</span>
           </div>
@@ -802,22 +887,31 @@ def _get_html_dashboard() -> str:
           <div class="edge-filter-pill active" style="color: var(--badge-purple-text);" onclick="toggleEdgeFilter('DEFINES')">
             <div class="edge-filter-left">
               <div class="hud-dot" style="background: var(--badge-purple-text);"></div>
-              <span>DEFINES & EXTENDS</span>
+              <span>CLASSES & EXTENDS</span>
             </div>
             <span class="edge-count-badge" id="count-DEFINES">0</span>
           </div>
         </div>
 
+        <!-- DENSITY SELECTOR -->
+        <div class="hud-density">
+          <span style="font-size: 9px; color: var(--text-light-muted);">DENSITY:</span>
+          <div class="density-btn-group">
+            <button class="btn-density active" onclick="setDensity(28)">CORE 28</button>
+            <button class="btn-density" onclick="setDensity(60)">STD 60</button>
+            <button class="btn-density" onclick="setDensity(120)">ALL 120</button>
+          </div>
+        </div>
+
         <div class="hud-actions">
-          <button class="btn-hud" id="btn-3d" onclick="toggle3DMode()">3D ORBITAL</button>
-          <button class="btn-hud" onclick="resetPhysics()">UNTANGLE</button>
-          <button class="btn-hud" onclick="exportGraph()">SNAPSHOT</button>
+          <button class="btn-hud" onclick="zoomIn()">ZOOM +</button>
+          <button class="btn-hud" onclick="zoomOut()">ZOOM &minus;</button>
+          <button class="btn-hud" onclick="resetView()">RESET</button>
         </div>
       </div>
 
       <div class="graph-search-box">
-        <input type="text" id="graph-search" class="search-input" placeholder="Search symbol or caller (e.g. User, Indexer)..." oninput="filterGraph(this.value)">
-        <button id="btn-clear-focus" class="btn-clear-focus" onclick="clearFocus()">CLEAR FOCUS ✕</button>
+        <input type="text" id="graph-search" class="search-input" placeholder="Search symbol or caller (e.g. Indexer)..." oninput="filterGraph(this.value)">
       </div>
 
       <canvas id="graph-canvas"></canvas>
@@ -1295,22 +1389,23 @@ def _get_html_dashboard() -> str:
     }
 
     // ====================================================================
-    // ADVANCED CLUSTERED KNOWLEDGE GRAPH WITH DIRECTED ARROWS & FILTERS
+    // CRYSTAL-CLEAR ARCHITECTURE GRAPH: PIPELINE DAG + ANTI-COLLISION
     // ====================================================================
     let nodes = [];
     let edges = [];
-    let is3D = false;
-    let angleX = 0.25;
-    let angleY = 0.35;
-    let isDragging = false;
-    let prevMouseX = 0;
-    let prevMouseY = 0;
+    let viewMode = 'pipeline'; // 'pipeline' (L -> R) or 'galaxy' (orbital)
+    let currentDensity = 28;
+    let zoomLevel = 1.0;
+    let panX = 0;
+    let panY = 0;
+    let isPanning = false;
+    let startPanX = 0;
+    let startPanY = 0;
     let searchQuery = '';
     let selectedNodeIndex = -1;
     let hoveredNodeIndex = -1;
     let animTime = 0;
 
-    // Active Edge Filters
     const activeFilters = {
       'CALLS': true,
       'IMPORTS': true,
@@ -1319,41 +1414,40 @@ def _get_html_dashboard() -> str:
       'DEFINES': true
     };
 
+    function setViewMode(mode) {
+      viewMode = mode;
+      document.getElementById('btn-mode-dag').classList.toggle('active', mode === 'pipeline');
+      document.getElementById('btn-mode-orbital').classList.toggle('active', mode === 'galaxy');
+      applyLayoutPositions();
+    }
+
+    function setDensity(num) {
+      currentDensity = num;
+      document.querySelectorAll('.btn-density').forEach(b => {
+        b.classList.toggle('active', b.textContent.includes(String(num)));
+      });
+      loadGraphData();
+    }
+
     function toggleEdgeFilter(cat) {
       activeFilters[cat] = !activeFilters[cat];
       const pill = event.currentTarget;
-      if (activeFilters[cat]) {
-        pill.classList.add('active');
-      } else {
-        pill.classList.remove('active');
-      }
-      const activeCount = Object.values(activeFilters).filter(Boolean).length;
-      document.getElementById('hud-filter-status').textContent = 
-        activeCount === 5 ? 'ALL ON' : `${activeCount} ACTIVE`;
+      pill.classList.toggle('active', activeFilters[cat]);
     }
 
-    function toggle3DMode() {
-      is3D = !is3D;
-      document.getElementById('btn-3d').textContent = is3D ? '2D PLANE' : '3D ORBITAL';
-      document.getElementById('btn-3d').style.background = is3D ? 'var(--accent-orange)' : 'rgba(255,255,255,0.06)';
-      document.getElementById('btn-3d').style.color = is3D ? '#000' : '#FFF';
+    function zoomIn() {
+      zoomLevel = Math.min(3.0, zoomLevel * 1.25);
     }
 
-    function resetPhysics() {
-      nodes.forEach(n => {
-        n.x = (Math.random() - 0.5) * 500;
-        n.y = (Math.random() - 0.5) * 400;
-        n.z = (Math.random() - 0.5) * 400;
-        n.vx = 0; n.vy = 0; n.vz = 0;
-      });
+    function zoomOut() {
+      zoomLevel = Math.max(0.35, zoomLevel * 0.8);
     }
 
-    function exportGraph() {
-      const canvas = document.getElementById('graph-canvas');
-      const link = document.createElement('a');
-      link.download = 'codegraph-knowledge-map.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+    function resetView() {
+      zoomLevel = 1.0;
+      panX = 0;
+      panY = 0;
+      applyLayoutPositions();
     }
 
     function filterGraph(query) {
@@ -1367,24 +1461,28 @@ def _get_html_dashboard() -> str:
     function clearFocus() {
       selectedNodeIndex = -1;
       hoveredNodeIndex = -1;
-      document.getElementById('btn-clear-focus').style.display = 'none';
+      document.getElementById('focus-banner').style.display = 'none';
       document.getElementById('node-drawer').style.display = 'none';
     }
 
     function selectNode(idx) {
       selectedNodeIndex = idx;
-      document.getElementById('btn-clear-focus').style.display = 'inline-block';
       const n = nodes[idx];
+      
+      const banner = document.getElementById('focus-banner');
+      banner.style.display = 'flex';
+      document.getElementById('focus-banner-text').textContent = `SPOTLIGHT: ${n.name} (${n.kind || 'Symbol'})`;
+
       const drawer = document.getElementById('node-drawer');
       document.getElementById('drawer-name').textContent = n.name;
       document.getElementById('drawer-body').innerHTML = `
         <div><strong>Kind:</strong> <span style="color:#FFF;">${n.kind || 'Symbol'}</span></div>
-        <div><strong>Language:</strong> <span style="color:#FFF;">${n.language || 'polyglot'}</span></div>
-        <div><strong>Source File:</strong> <span style="color:var(--accent-orange);">${n.path || 'unknown'}:${n.line || 1}</span></div>
+        <div><strong>Architecture Layer:</strong> <span style="color:var(--accent-orange);">${n.layerName || 'Core Engine'}</span></div>
+        <div><strong>Source File:</strong> <span style="color:#FFF;">${n.path || 'unknown'}:${n.line || 1}</span></div>
         <div><strong>Canonical ID:</strong> <span style="font-size:10px; color:#A0A6AF;">${n.id || n.name}</span></div>
       `;
 
-      // Find Callers (Edges where target is idx)
+      // Find Callers (Inbound)
       const callers = edges.filter(e => e.targetIndex === idx);
       const callersContainer = document.getElementById('drawer-callers');
       if (callers.length) {
@@ -1393,10 +1491,10 @@ def _get_html_dashboard() -> str:
           return `<span class="connection-pill" onclick="selectNode(${e.sourceIndex})">&larr; ${s ? s.name : 'Caller'} <span style="opacity:0.6;">(${e.relationship})</span></span>`;
         }).join('');
       } else {
-        callersContainer.innerHTML = '<span style="color:var(--text-light-muted); font-style:italic;">No inbound callers in active cluster</span>';
+        callersContainer.innerHTML = '<span style="color:var(--text-light-muted); font-style:italic;">Top-level entrypoint (no callers)</span>';
       }
 
-      // Find Callees (Edges where source is idx)
+      // Find Callees (Outbound)
       const callees = edges.filter(e => e.sourceIndex === idx);
       const calleesContainer = document.getElementById('drawer-callees');
       if (callees.length) {
@@ -1405,13 +1503,12 @@ def _get_html_dashboard() -> str:
           return `<span class="connection-pill" onclick="selectNode(${e.targetIndex})">&rarr; ${t ? t.name : 'Callee'} <span style="opacity:0.6;">(${e.relationship})</span></span>`;
         }).join('');
       } else {
-        calleesContainer.innerHTML = '<span style="color:var(--text-light-muted); font-style:italic;">Leaf node (no outbound callees)</span>';
+        calleesContainer.innerHTML = '<span style="color:var(--text-light-muted); font-style:italic;">Terminal leaf node</span>';
       }
 
       drawer.style.display = 'block';
     }
 
-    // Helper to categorize relationship
     function getEdgeCategory(rel) {
       if (rel === 'CALLS') return 'CALLS';
       if (rel.includes('IMPORT') || rel.includes('EXPORT')) return 'IMPORTS';
@@ -1420,19 +1517,77 @@ def _get_html_dashboard() -> str:
       return 'DEFINES';
     }
 
-    async function renderGraph() {
-      const canvas = document.getElementById('graph-canvas');
-      canvas.width = canvas.parentElement.clientWidth;
-      canvas.height = canvas.parentElement.clientHeight;
-      const ctx = canvas.getContext('2d');
+    function assignArchitectureLayer(n) {
+      const p = (n.path || '').toLowerCase();
+      const name = (n.name || '').toLowerCase();
 
-      if (!nodes.length) {
-        const res = await fetch('/api/graph?max_nodes=220');
+      if (p.includes('cli') || p.includes('mcp/server') || name.includes('app') || name.includes('main')) {
+        n.layer = 0;
+        n.layerName = 'CLI & Protocol Entrypoints';
+      } else if (p.includes('indexer') || p.includes('watcher') || p.includes('impact') || p.includes('refactor')) {
+        n.layer = 1;
+        n.layerName = 'Core Intelligence Engines';
+      } else if (p.includes('parser') || p.includes('tree') || p.includes('drift') || p.includes('search')) {
+        n.layer = 2;
+        n.layerName = 'AST & Syntactic Parsers';
+      } else {
+        n.layer = 3;
+        n.layerName = 'Storage, Cache & WAL';
+      }
+    }
+
+    function applyLayoutPositions() {
+      const canvas = document.getElementById('graph-canvas');
+      const w = canvas.width || 1200;
+      const h = canvas.height || 700;
+
+      if (viewMode === 'pipeline') {
+        // CLEAN LEFT-TO-RIGHT SWIMLANES (ZERO CROSSING CONFUSION!)
+        const layers = [[], [], [], []];
+        nodes.forEach(n => {
+          assignArchitectureLayer(n);
+          layers[n.layer].push(n);
+        });
+
+        const colWidth = (w - 240) / 4;
+        const startX = -w / 2 + 160;
+
+        layers.forEach((layerNodes, lIdx) => {
+          const colX = startX + lIdx * colWidth;
+          const count = layerNodes.length;
+          const spacing = Math.min(65, (h - 160) / Math.max(1, count));
+          const startY = -(count * spacing) / 2;
+
+          layerNodes.forEach((n, idx) => {
+            n.targetX = colX;
+            n.targetY = startY + idx * spacing + (spacing / 2);
+            n.x = n.targetX;
+            n.y = n.targetY;
+            n.vx = 0; n.vy = 0;
+          });
+        });
+      } else {
+        // GALAXY ORBITAL CLUSTERS
+        nodes.forEach((n, i) => {
+          const theta = (i / nodes.length) * 2 * Math.PI;
+          const rad = 220 + (i % 3) * 60;
+          n.targetX = Math.cos(theta) * rad;
+          n.targetY = Math.sin(theta) * rad;
+          n.x = n.targetX;
+          n.y = n.targetY;
+          n.vx = 0; n.vy = 0;
+        });
+      }
+    }
+
+    async function loadGraphData() {
+      try {
+        const res = await fetch(`/api/graph?max_nodes=${currentDensity}`);
         const graphData = await res.json();
         nodes = graphData.nodes || [];
         edges = graphData.edges || [];
 
-        // Count edges per category for HUD badges
+        // Count category edges
         const counts = { 'CALLS': 0, 'IMPORTS': 0, 'MOUNTS': 0, 'DATABASE': 0, 'DEFINES': 0 };
         edges.forEach(e => {
           const cat = getEdgeCategory(e.relationship);
@@ -1445,46 +1600,28 @@ def _get_html_dashboard() -> str:
           if (elem) elem.textContent = cnt;
         }
 
-        // Initialize node positions with module cluster grouping
-        nodes.forEach((n, i) => {
-          const theta = (i / nodes.length) * 2 * Math.PI;
-          const rad = 180 + (Math.random() - 0.5) * 80;
-          n.x = Math.cos(theta) * rad;
-          n.y = Math.sin(theta) * rad;
-          n.z = (Math.random() - 0.5) * 350;
-          n.vx = 0; n.vy = 0; n.vz = 0;
-        });
+        applyLayoutPositions();
+      } catch (err) {
+        console.error('Failed to load graph:', err);
+      }
+    }
+
+    async function renderGraph() {
+      const canvas = document.getElementById('graph-canvas');
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+      const ctx = canvas.getContext('2d');
+
+      if (!nodes.length) {
+        await loadGraphData();
       }
 
-      function project(x, y, z) {
-        if (!is3D) {
-          return { x: canvas.width / 2 + x, y: canvas.height / 2 + y, scale: 1.0, z: 0 };
-        }
-        const cosY = Math.cos(angleY), sinY = Math.sin(angleY);
-        const x1 = x * cosY + z * sinY;
-        const z1 = -x * sinY + z * cosY;
-
-        const cosX = Math.cos(angleX), sinX = Math.sin(angleX);
-        const y2 = y * cosX - z1 * sinX;
-        const z2 = y * sinX + z1 * cosX;
-
-        const focal = 650;
-        const scale = focal / (focal + z2 + 350);
-        return {
-          x: canvas.width / 2 + x1 * scale,
-          y: canvas.height / 2 + y2 * scale,
-          scale: Math.max(0.2, scale),
-          z: z2,
-        };
-      }
-
-      function drawArrow(fromX, fromY, toX, toY, color, alpha, radiusTarget) {
+      function drawCurvedArrow(fromX, fromY, toX, toY, color, alpha, radiusTarget) {
         const dx = toX - fromX;
         const dy = toY - fromY;
         const dist = Math.hypot(dx, dy);
         if (dist < 15) return;
 
-        // Clip to edge of target node circle
         const clipDist = radiusTarget + 4;
         const endX = toX - (dx / dist) * clipDist;
         const endY = toY - (dy / dist) * clipDist;
@@ -1493,14 +1630,22 @@ def _get_html_dashboard() -> str:
         ctx.fillStyle = color;
         ctx.globalAlpha = alpha;
 
-        // Line
+        // Draw curved bezier line in pipeline mode for clean flow
         ctx.beginPath();
         ctx.moveTo(fromX, fromY);
-        ctx.lineTo(endX, endY);
+        if (viewMode === 'pipeline') {
+          const cx1 = fromX + (endX - fromX) * 0.5;
+          const cy1 = fromY;
+          const cx2 = fromX + (endX - fromX) * 0.5;
+          const cy2 = endY;
+          ctx.bezierCurveTo(cx1, cy1, cx2, cy2, endX, endY);
+        } else {
+          ctx.lineTo(endX, endY);
+        }
         ctx.stroke();
 
         // Arrowhead
-        const headLen = 7;
+        const headLen = 6;
         const angle = Math.atan2(dy, dx);
         ctx.beginPath();
         ctx.moveTo(endX, endY);
@@ -1515,14 +1660,35 @@ def _get_html_dashboard() -> str:
         animTime += 0.015;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Project all nodes
-        nodes.forEach(n => {
-          const p = project(n.x, n.y, n.z);
-          n.screenX = p.x;
-          n.screenY = p.y;
-          n.scale = p.scale;
-          n.depthZ = p.z;
-        });
+        const centerX = canvas.width / 2 + panX;
+        const centerY = canvas.height / 2 + panY;
+
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.scale(zoomLevel, zoomLevel);
+
+        // DRAW PIPELINE SWIMLANE HEADERS (IF IN PIPELINE MODE)
+        if (viewMode === 'pipeline') {
+          const w = canvas.width;
+          const colWidth = (w - 240) / 4;
+          const startX = -w / 2 + 160;
+          const headers = [
+            '01 · ENTRYPOINTS',
+            '02 · CORE ENGINES',
+            '03 · PARSERS & AST',
+            '04 · STORAGE & WAL'
+          ];
+
+          headers.forEach((hName, idx) => {
+            const colX = startX + idx * colWidth;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.fillRect(colX - 80, -canvas.height / 2 + 30, 160, canvas.height - 60);
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.font = '10px "JetBrains Mono", monospace';
+            ctx.fillText(hName, colX - 50, -canvas.height / 2 + 50);
+          });
+        }
 
         const isFocusActive = selectedNodeIndex !== -1 || hoveredNodeIndex !== -1;
         const focusIdx = selectedNodeIndex !== -1 ? selectedNodeIndex : hoveredNodeIndex;
@@ -1536,8 +1702,8 @@ def _get_html_dashboard() -> str:
           if (!s || !t) return;
 
           const isConnectedToFocus = (e.sourceIndex === focusIdx || e.targetIndex === focusIdx);
-          
-          let alpha = 0.22;
+
+          let alpha = 0.25;
           let width = 1.0;
           let edgeColor = '#FF5400';
 
@@ -1551,45 +1717,30 @@ def _get_html_dashboard() -> str:
               alpha = 1.0;
               width = 2.4;
             } else {
-              alpha = 0.04;
+              alpha = 0.03;
             }
           }
 
           ctx.lineWidth = width;
-          drawArrow(s.screenX, s.screenY, t.screenX, t.screenY, edgeColor, alpha, (t.scale || 1.0) * 6);
+          drawCurvedArrow(s.x, s.y, t.x, t.y, edgeColor, alpha, 6);
 
           // Flowing Energy Particle along active edges
           if (!isFocusActive || isConnectedToFocus) {
-            const particlePhase = (animTime + (e.sourceIndex * 0.17)) % 1.0;
-            const px = s.screenX + (t.screenX - s.screenX) * particlePhase;
-            const py = s.screenY + (t.screenY - s.screenY) * particlePhase;
+            const phase = (animTime + (e.sourceIndex * 0.2)) % 1.0;
+            const px = s.x + (t.x - s.x) * phase;
+            const py = s.y + (t.y - s.y) * phase;
             
             ctx.beginPath();
             ctx.arc(px, py, isConnectedToFocus ? 2.5 : 1.5, 0, 2 * Math.PI);
             ctx.fillStyle = edgeColor;
-            ctx.globalAlpha = isConnectedToFocus ? 1.0 : 0.4;
-            ctx.shadowColor = edgeColor;
-            ctx.shadowBlur = isConnectedToFocus ? 6 : 2;
+            ctx.globalAlpha = isConnectedToFocus ? 1.0 : 0.45;
             ctx.fill();
-            ctx.shadowBlur = 0;
             ctx.globalAlpha = 1.0;
-          }
-
-          // Edge Relationship Label (Rendered directly in middle if connected to focus)
-          if (isFocusActive && isConnectedToFocus) {
-            const midX = (s.screenX + t.screenX) / 2;
-            const midY = (s.screenY + t.screenY) / 2;
-            ctx.fillStyle = edgeColor;
-            ctx.font = '9px "JetBrains Mono", monospace';
-            ctx.fillText(e.relationship, midX + 4, midY - 4);
           }
         });
 
-        // 2. DEPTH SORT NODES
-        const sorted = is3D ? [...nodes].sort((a, b) => b.depthZ - a.depthZ) : nodes;
-
-        // 3. DRAW NODES
-        sorted.forEach((n, origIdx) => {
+        // 2. DRAW NODES & ANTI-COLLISION LABELS
+        nodes.forEach((n, origIdx) => {
           const isSelected = selectedNodeIndex === origIdx;
           const isHovered = hoveredNodeIndex === origIdx;
           const isConnected = isFocusActive && edges.some(e => 
@@ -1598,111 +1749,77 @@ def _get_html_dashboard() -> str:
           );
           const isMatch = searchQuery ? n.name.toLowerCase().includes(searchQuery) : true;
 
-          let r = 5.5 * (n.scale || 1.0);
+          let r = 5.5;
           let alpha = 1.0;
           let nodeColor = n.color || '#FF5400';
 
           if (isFocusActive) {
             if (isSelected || isHovered) {
-              r = 9.0 * (n.scale || 1.0);
+              r = 8.5;
               alpha = 1.0;
             } else if (isConnected) {
-              r = 7.0 * (n.scale || 1.0);
+              r = 7.0;
               alpha = 0.95;
             } else {
-              alpha = 0.08;
+              alpha = 0.06;
             }
           }
 
-          if (!isMatch) alpha = 0.08;
+          if (!isMatch) alpha = 0.06;
 
           ctx.globalAlpha = alpha;
+
+          // Node Circle
           ctx.beginPath();
-          ctx.arc(n.screenX, n.screenY, r, 0, 2 * Math.PI);
+          ctx.arc(n.x, n.y, r, 0, 2 * Math.PI);
           ctx.fillStyle = nodeColor;
           ctx.shadowColor = nodeColor;
-          ctx.shadowBlur = (isSelected || isHovered) ? 14 : 4;
+          ctx.shadowBlur = (isSelected || isHovered) ? 12 : 3;
           ctx.fill();
           ctx.shadowBlur = 0;
 
-          // Border for selected node
           if (isSelected) {
-            ctx.lineWidth = 2.5;
+            ctx.lineWidth = 2.0;
             ctx.strokeStyle = '#FFFFFF';
             ctx.stroke();
           }
 
-          // Text Label
-          if ((!isFocusActive && (n.scale || 1.0) > 0.65) || (isFocusActive && (isSelected || isHovered || isConnected))) {
-            ctx.fillStyle = isSelected ? '#FFFFFF' : (isConnected ? '#FF5400' : '#E0E4EB');
-            ctx.font = `${Math.floor((isSelected ? 11 : 10) * (n.scale || 1.0))}px "JetBrains Mono", monospace`;
-            ctx.fillText(n.name, n.screenX + r + 4, n.screenY + 3);
+          // ANTI-COLLISION PILL LABEL (ONLY RENDER IF SELECTED, HOVERED, CONNECTED, OR MAJOR HUB)
+          const shouldShowLabel = isSelected || isHovered || isConnected || (!isFocusActive && currentDensity <= 35);
+
+          if (shouldShowLabel && alpha > 0.1) {
+            ctx.font = '10px "JetBrains Mono", monospace';
+            const textWidth = ctx.measureText(n.name).width;
+
+            // Pill background behind text prevents collisions!
+            ctx.fillStyle = 'rgba(17, 19, 22, 0.88)';
+            ctx.beginPath();
+            ctx.roundRect(n.x + r + 4, n.y - 8, textWidth + 10, 16, 4);
+            ctx.fill();
+
+            ctx.strokeStyle = isSelected ? 'var(--accent-orange)' : 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Text
+            ctx.fillStyle = isSelected ? '#FFFFFF' : (isConnected ? '#FF5400' : '#E2E6ED');
+            ctx.fillText(n.name, n.x + r + 9, n.y + 4);
           }
+
           ctx.globalAlpha = 1.0;
         });
 
-        // 3D Orbital rotation momentum if not dragging
-        if (is3D && !isDragging) {
-          angleY += 0.0012;
+        // Soft physics relaxation in galaxy mode
+        if (viewMode === 'galaxy') {
+          nodes.forEach(n => {
+            n.vx -= n.x * 0.0003;
+            n.vy -= n.y * 0.0003;
+            n.x += n.vx; n.y += n.vy;
+            n.vx *= 0.88; n.vy *= 0.88;
+          });
         }
 
-        // =======================================================
-        // REAL CLUSTERED SPRING EMBEDDING PHYSICS (FORCEATLAS2)
-        // =======================================================
-        // 1. Hooke's Law Spring Attraction along Edges
-        const idealDist = 95.0;
-        const springK = 0.0035;
-
-        edges.forEach(e => {
-          if (!activeFilters[e.category]) return;
-          const s = nodes[e.sourceIndex];
-          const t = nodes[e.targetIndex];
-          if (!s || !t) return;
-
-          const dx = t.x - s.x;
-          const dy = t.y - s.y;
-          const dz = t.z - s.z;
-          const dist = Math.hypot(dx, dy, dz) || 1;
-          const force = (dist - idealDist) * springK;
-
-          const fx = (dx / dist) * force;
-          const fy = (dy / dist) * force;
-          const fz = (dz / dist) * force;
-
-          s.vx += fx; s.vy += fy; s.vz += fz;
-          t.vx -= fx; t.vy -= fy; t.vz -= fz;
-        });
-
-        // 2. Coulomb Repulsion between Nodes
-        const repulseK = 800.0;
-        for (let i = 0; i < nodes.length; i++) {
-          const a = nodes[i];
-          for (let j = i + 1; j < nodes.length; j++) {
-            const b = nodes[j];
-            const dx = b.x - a.x;
-            const dy = b.y - a.y;
-            const dz = b.z - a.z;
-            const d2 = dx * dx + dy * dy + dz * dz + 100.0;
-            const force = repulseK / d2;
-            const dist = Math.sqrt(d2);
-
-            const fx = (dx / dist) * force;
-            const fy = (dy / dist) * force;
-            const fz = (dz / dist) * force;
-
-            a.vx -= fx; a.vy -= fy; a.vz -= fz;
-            b.vx += fx; b.vy += fy; b.vz += fz;
-          }
-        }
-
-        // 3. Center Gravity & Damping
-        nodes.forEach(n => {
-          n.vx -= n.x * 0.0004;
-          n.vy -= n.y * 0.0004;
-          n.vz -= n.z * 0.0004;
-          n.x += n.vx; n.y += n.vy; n.z += n.vz;
-          n.vx *= 0.85; n.vy *= 0.85; n.vz *= 0.85;
-        });
+        ctx.restore();
       }
 
       setInterval(() => {
@@ -1710,38 +1827,48 @@ def _get_html_dashboard() -> str:
       }, 30);
     }
 
-    // Interaction Listeners
+    // INTERACTION: PAN, ZOOM, AND CLICK SELECTION
     const canvasElem = document.getElementById('graph-canvas');
+
+    // Pan Handlers
     canvasElem.addEventListener('mousedown', e => {
-      isDragging = true;
-      prevMouseX = e.clientX;
-      prevMouseY = e.clientY;
+      isPanning = true;
+      startPanX = e.clientX - panX;
+      startPanY = e.clientY - panY;
     });
-    window.addEventListener('mouseup', () => { isDragging = false; });
+
+    window.addEventListener('mouseup', () => { isPanning = false; });
+
     canvasElem.addEventListener('mousemove', e => {
-      if (isDragging && is3D) {
-        const dx = e.clientX - prevMouseX;
-        const dy = e.clientY - prevMouseY;
-        angleY += dx * 0.006;
-        angleX += dy * 0.006;
-        prevMouseX = e.clientX;
-        prevMouseY = e.clientY;
-      } else if (!isDragging) {
-        // Hover Detection
+      if (isPanning) {
+        panX = e.clientX - startPanX;
+        panY = e.clientY - startPanY;
+      } else {
+        // Detect Hover
         const rect = canvasElem.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-        const found = nodes.findIndex(n => Math.hypot(n.screenX - mx, n.screenY - my) < 14);
+        const mouseX = (e.clientX - rect.left - (canvasElem.width / 2 + panX)) / zoomLevel;
+        const mouseY = (e.clientY - rect.top - (canvasElem.height / 2 + panY)) / zoomLevel;
+
+        const found = nodes.findIndex(n => Math.hypot(n.x - mouseX, n.y - mouseY) < 14);
         hoveredNodeIndex = found;
-        canvasElem.style.cursor = found !== -1 ? 'pointer' : 'default';
+        canvasElem.style.cursor = found !== -1 ? 'pointer' : (isPanning ? 'grabbing' : 'grab');
       }
     });
 
+    // Zoom on Mouse Wheel
+    canvasElem.addEventListener('wheel', e => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.12 : 0.89;
+      zoomLevel = Math.max(0.35, Math.min(3.5, zoomLevel * zoomFactor));
+    }, { passive: false });
+
+    // Click Selection
     canvasElem.addEventListener('click', e => {
       const rect = canvasElem.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const hit = nodes.findIndex(n => Math.hypot(n.screenX - x, n.screenY - y) < 15);
+      const mouseX = (e.clientX - rect.left - (canvasElem.width / 2 + panX)) / zoomLevel;
+      const mouseY = (e.clientY - rect.top - (canvasElem.height / 2 + panY)) / zoomLevel;
+
+      const hit = nodes.findIndex(n => Math.hypot(n.x - mouseX, n.y - mouseY) < 15);
       if (hit !== -1) {
         selectNode(hit);
       } else {
@@ -1901,87 +2028,95 @@ class CodeGraphUIRequestHandler(BaseHTTPRequestHandler):
     def _handle_api_graph(self) -> None:
         try:
             query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            limit = int(query.get("max_nodes", [200])[0])
+            density = int(query.get("max_nodes", [28])[0])
+            hub_limit = max(10, density // 2)
+
             with self.indexer.session() as con:
-                # Query real connected edges between validated symbols to avoid isolated noise
-                sql_edges = """
-                SELECT e.source, e.target, e.relationship,
-                       s1.name as s_name, s1.kind as s_kind, s1.path as s_path, s1.start_line as s_line, s1.language as s_lang,
-                       s2.name as t_name, s2.kind as t_kind, s2.path as t_path, s2.start_line as t_line, s2.language as t_lang
-                FROM graph_edges e
-                JOIN symbols s1 ON e.source = s1.id
-                JOIN symbols s2 ON e.target = s2.id
-                WHERE e.relationship IN ('CALLS', 'IMPORTS', 'MOUNTS', 'DISPATCHES_TO', 'INJECTS', 'WRITES_TABLE', 'READS_TABLE', 'DEFINES', 'EXTENDS')
-                ORDER BY CASE 
-                    WHEN e.relationship = 'CALLS' THEN 1
-                    WHEN e.relationship IN ('MOUNTS', 'DISPATCHES_TO') THEN 2
-                    WHEN e.relationship IN ('WRITES_TABLE', 'READS_TABLE') THEN 3
-                    WHEN e.relationship = 'IMPORTS' THEN 4
-                    ELSE 5
-                END
+                # 1. Fetch top central architecture hub symbols
+                top_sym_sql = """
+                SELECT s.id, s.name, s.kind, s.path, s.start_line, s.language, count(e.source) as degree
+                FROM symbols s
+                JOIN graph_edges e ON e.source = s.id
+                WHERE s.name NOT IN ('__init__', '__repr__', '__str__', 'setUp', 'tearDown')
+                GROUP BY s.id
+                ORDER BY degree DESC
                 LIMIT ?
                 """
-                edge_rows = con.execute(sql_edges, [limit * 2]).fetchall()
+                top_syms = con.execute(top_sym_sql, [hub_limit]).fetchall()
+                hub_ids = [str(r["id"]) for r in top_syms]
+
+                # 2. Fetch direct 1-hop callees of these hubs
+                if hub_ids:
+                    placeholders = ",".join("?" for _ in hub_ids)
+                    callee_sql = f"""
+                    SELECT DISTINCT e.target
+                    FROM graph_edges e
+                    WHERE e.source IN ({placeholders})
+                    LIMIT ?
+                    """
+                    callee_rows = con.execute(callee_sql, hub_ids + [density - len(hub_ids)]).fetchall()
+                    callee_ids = [str(r[0]) for r in callee_rows]
+                    combined_ids = list(dict.fromkeys(hub_ids + callee_ids))
+                else:
+                    combined_ids = []
 
                 node_map: dict[str, int] = {}
                 nodes: list[dict[str, Any]] = []
-                edges: list[dict[str, Any]] = []
 
-                def _add_node(nid: str, name: str, kind: str, path: str, line: int, lang: str) -> int:
-                    if nid in node_map:
-                        return node_map[nid]
-                    idx = len(nodes)
-                    node_map[nid] = idx
-                    kind_upper = kind.upper()
-                    color = "#FF5400"
-                    if "CLASS" in kind_upper or "STRUCT" in kind_upper:
-                        color = "#BC8CFF"
-                    elif "ROUTE" in kind_upper:
-                        color = "#2EA043"
-                    elif "TABLE" in kind_upper:
-                        color = "#D29922"
-                    elif "INTERFACE" in kind_upper:
-                        color = "#38BDF8"
+                if combined_ids:
+                    comb_placeholders = ",".join("?" for _ in combined_ids)
+                    sym_info_sql = f"""
+                    SELECT id, name, kind, path, start_line, language
+                    FROM symbols
+                    WHERE id IN ({comb_placeholders})
+                    """
+                    sym_info_rows = con.execute(sym_info_sql, combined_ids).fetchall()
+                    for idx, r in enumerate(sym_info_rows):
+                        nid = str(r["id"])
+                        node_map[nid] = idx
+                        kind_upper = str(r["kind"]).upper()
+                        color = "#FF5400"
+                        if "CLASS" in kind_upper or "STRUCT" in kind_upper:
+                            color = "#BC8CFF"
+                        elif "ROUTE" in kind_upper:
+                            color = "#2EA043"
+                        elif "TABLE" in kind_upper:
+                            color = "#D29922"
+                        elif "INTERFACE" in kind_upper:
+                            color = "#38BDF8"
 
-                    nodes.append({
-                        "id": nid,
-                        "name": name,
-                        "kind": kind_upper,
-                        "path": path,
-                        "line": line,
-                        "language": lang or "polyglot",
-                        "color": color,
-                    })
-                    return idx
+                        nodes.append({
+                            "id": nid,
+                            "name": str(r["name"]),
+                            "kind": kind_upper,
+                            "path": str(r["path"]),
+                            "line": int(r["start_line"]),
+                            "language": str(r["language"] or "python"),
+                            "color": color,
+                        })
 
-                for r in edge_rows:
-                    src_id = str(r["source"])
-                    tgt_id = str(r["target"])
-                    s_idx = _add_node(
-                        src_id,
-                        str(r["s_name"]),
-                        str(r["s_kind"]),
-                        str(r["s_path"]),
-                        int(r["s_line"]),
-                        str(r["s_lang"]),
-                    )
-                    t_idx = _add_node(
-                        tgt_id,
-                        str(r["t_name"]),
-                        str(r["t_kind"]),
-                        str(r["t_path"]),
-                        int(r["t_line"]),
-                        str(r["t_lang"]),
-                    )
+                    # 3. Fetch connected edges between all combined nodes
+                    edge_params = combined_ids * 2
+                    edge_sql = f"""
+                    SELECT e.source, e.target, e.relationship
+                    FROM graph_edges e
+                    WHERE e.source IN ({comb_placeholders}) AND e.target IN ({comb_placeholders})
+                    LIMIT 150
+                    """
+                    edge_rows = con.execute(edge_sql, edge_params).fetchall()
+                    edges: list[dict[str, Any]] = []
 
-                    edges.append({
-                        "sourceIndex": s_idx,
-                        "targetIndex": t_idx,
-                        "relationship": str(r["relationship"]),
-                    })
-
-                    if len(nodes) >= limit:
-                        break
+                    for e in edge_rows:
+                        s_nid = str(e["source"])
+                        t_nid = str(e["target"])
+                        if s_nid in node_map and t_nid in node_map:
+                            edges.append({
+                                "sourceIndex": node_map[s_nid],
+                                "targetIndex": node_map[t_nid],
+                                "relationship": str(e["relationship"]),
+                            })
+                else:
+                    edges = []
 
                 payload = {"nodes": nodes, "edges": edges}
         except Exception:
