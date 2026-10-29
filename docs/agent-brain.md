@@ -4166,7 +4166,7 @@ Compile a token-bounded, coverage-optimized ContextPacket containing verified sy
 `query`
 
 #### Optional inputs
-`task`, `intent`, `max_tokens`, `max_files`, `max_lines`, `top_k`, `plan`, `mode`, `explain`, `resource_mode`
+`task`, `intent`, `max_tokens`, `budget_tokens`, `max_files`, `max_lines`, `top_k`, `plan`, `mode`, `explain`, `resource_mode`
 
 #### Minimal invocation
 ```python

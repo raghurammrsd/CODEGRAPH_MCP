@@ -759,7 +759,7 @@ TOOL_CAPABILITY_REGISTRY: tuple[ToolCapabilitySpec, ...] = (
             AgentTaskCategory.PACKAGE.value,
         ),
         required_inputs=("query",),
-        optional_inputs=("task", "intent", "max_tokens", "max_files", "max_lines", "top_k", "plan", "mode", "explain", "resource_mode"),
+        optional_inputs=("task", "intent", "max_tokens", "budget_tokens", "max_files", "max_lines", "top_k", "plan", "mode", "explain", "resource_mode"),
         expected_output_type="ContextPacket",
         relationship_types_returned=(
             "CALLS",
