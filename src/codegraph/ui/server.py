@@ -1294,9 +1294,17 @@ def _get_html_dashboard() -> str:
     function switchTab(tabId) {
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-      event.currentTarget.classList.add('active');
-      document.getElementById(tabId + '-pane').classList.add('active');
-      if (tabId === 'graph') renderGraph();
+      if (event && event.currentTarget) event.currentTarget.classList.add('active');
+      const pane = document.getElementById(tabId + '-pane');
+      if (pane) pane.classList.add('active');
+      if (tabId === 'graph') {
+        resizeCanvas();
+        if (!nodes.length) {
+          loadGraphData();
+        } else {
+          applyLayoutPositions();
+        }
+      }
     }
 
     // Load Data from Local Server Endpoints
@@ -1419,7 +1427,11 @@ def _get_html_dashboard() -> str:
       viewMode = mode;
       document.getElementById('btn-mode-dag').classList.toggle('active', mode === 'pipeline');
       document.getElementById('btn-mode-orbital').classList.toggle('active', mode === 'radial');
-      applyLayoutPositions();
+      if (!nodes.length) {
+        loadGraphData();
+      } else {
+        applyLayoutPositions();
+      }
     }
 
     function setDensity(num) {
@@ -1633,221 +1645,254 @@ def _get_html_dashboard() -> str:
       }
     }
 
-    async function renderGraph() {
+    function resizeCanvas() {
       const canvas = document.getElementById('graph-canvas');
-      canvas.width = canvas.parentElement.clientWidth;
-      canvas.height = canvas.parentElement.clientHeight;
-      const ctx = canvas.getContext('2d');
+      if (!canvas || !canvas.parentElement) return;
+      canvas.width = Math.max(800, canvas.parentElement.clientWidth || 1200);
+      canvas.height = Math.max(500, canvas.parentElement.clientHeight || 700);
+    }
 
-      if (!nodes.length) {
-        await loadGraphData();
+    const canvasElem = document.getElementById('graph-canvas');
+    const ctx = canvasElem.getContext('2d');
+
+    function drawCurvedArrow(fromX, fromY, toX, toY, color, alpha, radiusTarget) {
+      const dx = toX - fromX;
+      const dy = toY - fromY;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 15) return;
+
+      const clipDist = radiusTarget + 4;
+      const endX = toX - (dx / dist) * clipDist;
+      const endY = toY - (dy / dist) * clipDist;
+
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.globalAlpha = alpha;
+
+      // Draw curved bezier line in pipeline mode for clean flow
+      ctx.beginPath();
+      ctx.moveTo(fromX, fromY);
+      if (viewMode === 'pipeline') {
+        const cx1 = fromX + (endX - fromX) * 0.5;
+        const cy1 = fromY;
+        const cx2 = fromX + (endX - fromX) * 0.5;
+        const cy2 = endY;
+        ctx.bezierCurveTo(cx1, cy1, cx2, cy2, endX, endY);
+      } else {
+        ctx.lineTo(endX, endY);
+      }
+      ctx.stroke();
+
+      // Arrowhead
+      const headLen = 6;
+      const angle = Math.atan2(dy, dx);
+      ctx.beginPath();
+      ctx.moveTo(endX, endY);
+      ctx.lineTo(endX - headLen * Math.cos(angle - Math.PI / 6), endY - headLen * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(endX - headLen * Math.cos(angle + Math.PI / 6), endY - headLen * Math.sin(angle + Math.PI / 6));
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+    }
+
+    function tick() {
+      animTime += 0.015;
+      ctx.clearRect(0, 0, canvasElem.width, canvasElem.height);
+
+      const centerX = canvasElem.width / 2 + panX;
+      const centerY = canvasElem.height / 2 + panY;
+
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.scale(zoomLevel, zoomLevel);
+
+      // DRAW PIPELINE SWIMLANE HEADERS (IF IN PIPELINE MODE)
+      if (viewMode === 'pipeline') {
+        const w = canvasElem.width;
+        const colWidth = (w - 220) / 4;
+        const startX = -w / 2 + 150;
+        const headers = [
+          '01 · ENTRYPOINTS',
+          '02 · CORE ENGINES',
+          '03 · PARSERS & AST',
+          '04 · STORAGE & DATABASE'
+        ];
+
+        headers.forEach((hName, idx) => {
+          const colX = startX + idx * colWidth;
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+          ctx.fillRect(colX - 85, -canvasElem.height / 2 + 30, 170, canvasElem.height - 60);
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+          ctx.font = '10px "JetBrains Mono", monospace';
+          ctx.fillText(hName, colX - 60, -canvasElem.height / 2 + 50);
+        });
+      } else {
+        // DRAW ORBITAL RING GUIDELINES (IF IN RADIAL MODE)
+        const w = canvasElem.width;
+        const h = canvasElem.height;
+        const ringConfigs = [
+          { r: Math.min(w, h) * 0.18, label: '01 · CORE INTELLIGENCE' },
+          { r: Math.min(w, h) * 0.32, label: '02 · PARSERS & STORAGE' },
+          { r: Math.min(w, h) * 0.44, label: '03 · APIS & ENTRYPOINTS' }
+        ];
+
+        ringConfigs.forEach(rc => {
+          ctx.beginPath();
+          ctx.arc(0, 0, rc.r, 0, 2 * Math.PI);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+          ctx.font = '9px "JetBrains Mono", monospace';
+          ctx.fillText(rc.label, -55, -rc.r - 4);
+        });
       }
 
-      function drawCurvedArrow(fromX, fromY, toX, toY, color, alpha, radiusTarget) {
-        const dx = toX - fromX;
-        const dy = toY - fromY;
-        const dist = Math.hypot(dx, dy);
-        if (dist < 15) return;
+      const isFocusActive = selectedNodeIndex !== -1 || hoveredNodeIndex !== -1;
+      const focusIdx = selectedNodeIndex !== -1 ? selectedNodeIndex : hoveredNodeIndex;
 
-        const clipDist = radiusTarget + 4;
-        const endX = toX - (dx / dist) * clipDist;
-        const endY = toY - (dy / dist) * clipDist;
+      // 1. DRAW EDGES
+      edges.forEach(e => {
+        if (!activeFilters[e.category]) return;
 
-        ctx.strokeStyle = color;
-        ctx.fillStyle = color;
+        const s = nodes[e.sourceIndex];
+        const t = nodes[e.targetIndex];
+        if (!s || !t) return;
+
+        const isConnectedToFocus = (e.sourceIndex === focusIdx || e.targetIndex === focusIdx);
+
+        let alpha = 0.28;
+        let width = 1.0;
+        let edgeColor = '#FF5400';
+
+        if (e.category === 'IMPORTS') edgeColor = '#38BDF8';
+        else if (e.category === 'MOUNTS') edgeColor = '#2EA043';
+        else if (e.category === 'DATABASE') edgeColor = '#D29922';
+        else if (e.category === 'DEFINES') edgeColor = '#BC8CFF';
+
+        if (isFocusActive) {
+          if (isConnectedToFocus) {
+            alpha = 1.0;
+            width = 2.4;
+          } else {
+            alpha = 0.03;
+          }
+        }
+
+        ctx.lineWidth = width;
+        drawCurvedArrow(s.x, s.y, t.x, t.y, edgeColor, alpha, 6);
+
+        // Flowing Energy Particle along active edges
+        if (!isFocusActive || isConnectedToFocus) {
+          const phase = (animTime + (e.sourceIndex * 0.2)) % 1.0;
+          const px = s.x + (t.x - s.x) * phase;
+          const py = s.y + (t.y - s.y) * phase;
+          
+          ctx.beginPath();
+          ctx.arc(px, py, isConnectedToFocus ? 2.5 : 1.5, 0, 2 * Math.PI);
+          ctx.fillStyle = edgeColor;
+          ctx.globalAlpha = isConnectedToFocus ? 1.0 : 0.45;
+          ctx.fill();
+          ctx.globalAlpha = 1.0;
+        }
+      });
+
+      // 2. DRAW NODES & ANTI-COLLISION LABELS
+      nodes.forEach((n, origIdx) => {
+        const isSelected = selectedNodeIndex === origIdx;
+        const isHovered = hoveredNodeIndex === origIdx;
+        const isConnected = isFocusActive && edges.some(e => 
+          (e.sourceIndex === focusIdx && e.targetIndex === origIdx) ||
+          (e.targetIndex === focusIdx && e.sourceIndex === origIdx)
+        );
+        const isMatch = searchQuery ? n.name.toLowerCase().includes(searchQuery) : true;
+
+        let r = 5.5;
+        let alpha = 1.0;
+        let nodeColor = n.color || '#FF5400';
+
+        if (isFocusActive) {
+          if (isSelected || isHovered) {
+            r = 8.5;
+            alpha = 1.0;
+          } else if (isConnected) {
+            r = 7.0;
+            alpha = 0.95;
+          } else {
+            alpha = 0.06;
+          }
+        }
+
+        if (!isMatch) alpha = 0.06;
+
         ctx.globalAlpha = alpha;
 
-        // Draw curved bezier line in pipeline mode for clean flow
+        // Node Circle
         ctx.beginPath();
-        ctx.moveTo(fromX, fromY);
-        if (viewMode === 'pipeline') {
-          const cx1 = fromX + (endX - fromX) * 0.5;
-          const cy1 = fromY;
-          const cx2 = fromX + (endX - fromX) * 0.5;
-          const cy2 = endY;
-          ctx.bezierCurveTo(cx1, cy1, cx2, cy2, endX, endY);
-        } else {
-          ctx.lineTo(endX, endY);
-        }
-        ctx.stroke();
-
-        // Arrowhead
-        const headLen = 6;
-        const angle = Math.atan2(dy, dx);
-        ctx.beginPath();
-        ctx.moveTo(endX, endY);
-        ctx.lineTo(endX - headLen * Math.cos(angle - Math.PI / 6), endY - headLen * Math.sin(angle - Math.PI / 6));
-        ctx.lineTo(endX - headLen * Math.cos(angle + Math.PI / 6), endY - headLen * Math.sin(angle + Math.PI / 6));
-        ctx.closePath();
+        ctx.arc(n.x, n.y, r, 0, 2 * Math.PI);
+        ctx.fillStyle = nodeColor;
+        ctx.shadowColor = nodeColor;
+        ctx.shadowBlur = (isSelected || isHovered) ? 12 : 3;
         ctx.fill();
-        ctx.globalAlpha = 1.0;
-      }
+        ctx.shadowBlur = 0;
 
-      function tick() {
-        animTime += 0.015;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        const centerX = canvas.width / 2 + panX;
-        const centerY = canvas.height / 2 + panY;
-
-        ctx.save();
-        ctx.translate(centerX, centerY);
-        ctx.scale(zoomLevel, zoomLevel);
-
-        // DRAW PIPELINE SWIMLANE HEADERS (IF IN PIPELINE MODE)
-        if (viewMode === 'pipeline') {
-          const w = canvas.width;
-          const colWidth = (w - 240) / 4;
-          const startX = -w / 2 + 160;
-          const headers = [
-            '01 · ENTRYPOINTS',
-            '02 · CORE ENGINES',
-            '03 · PARSERS & AST',
-            '04 · STORAGE & DATABASE'
-          ];
-
-          headers.forEach((hName, idx) => {
-            const colX = startX + idx * colWidth;
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
-            ctx.fillRect(colX - 80, -canvas.height / 2 + 30, 160, canvas.height - 60);
-
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            ctx.font = '10px "JetBrains Mono", monospace';
-            ctx.fillText(hName, colX - 60, -canvas.height / 2 + 50);
-          });
+        if (isSelected) {
+          ctx.lineWidth = 2.0;
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.stroke();
         }
 
-        const isFocusActive = selectedNodeIndex !== -1 || hoveredNodeIndex !== -1;
-        const focusIdx = selectedNodeIndex !== -1 ? selectedNodeIndex : hoveredNodeIndex;
+        // ANTI-COLLISION PILL LABEL
+        const shouldShowLabel = isSelected || isHovered || isConnected || (!isFocusActive && currentDensity <= 40);
 
-        // 1. DRAW EDGES
-        edges.forEach(e => {
-          if (!activeFilters[e.category]) return;
+        if (shouldShowLabel && alpha > 0.1) {
+          ctx.font = '10px "JetBrains Mono", monospace';
+          const textWidth = ctx.measureText(n.name).width;
 
-          const s = nodes[e.sourceIndex];
-          const t = nodes[e.targetIndex];
-          if (!s || !t) return;
-
-          const isConnectedToFocus = (e.sourceIndex === focusIdx || e.targetIndex === focusIdx);
-
-          let alpha = 0.28;
-          let width = 1.0;
-          let edgeColor = '#FF5400';
-
-          if (e.category === 'IMPORTS') edgeColor = '#38BDF8';
-          else if (e.category === 'MOUNTS') edgeColor = '#2EA043';
-          else if (e.category === 'DATABASE') edgeColor = '#D29922';
-          else if (e.category === 'DEFINES') edgeColor = '#BC8CFF';
-
-          if (isFocusActive) {
-            if (isConnectedToFocus) {
-              alpha = 1.0;
-              width = 2.4;
-            } else {
-              alpha = 0.03;
-            }
-          }
-
-          ctx.lineWidth = width;
-          drawCurvedArrow(s.x, s.y, t.x, t.y, edgeColor, alpha, 6);
-
-          // Flowing Energy Particle along active edges
-          if (!isFocusActive || isConnectedToFocus) {
-            const phase = (animTime + (e.sourceIndex * 0.2)) % 1.0;
-            const px = s.x + (t.x - s.x) * phase;
-            const py = s.y + (t.y - s.y) * phase;
-            
-            ctx.beginPath();
-            ctx.arc(px, py, isConnectedToFocus ? 2.5 : 1.5, 0, 2 * Math.PI);
-            ctx.fillStyle = edgeColor;
-            ctx.globalAlpha = isConnectedToFocus ? 1.0 : 0.45;
-            ctx.fill();
-            ctx.globalAlpha = 1.0;
-          }
-        });
-
-        // 2. DRAW NODES & ANTI-COLLISION LABELS
-        nodes.forEach((n, origIdx) => {
-          const isSelected = selectedNodeIndex === origIdx;
-          const isHovered = hoveredNodeIndex === origIdx;
-          const isConnected = isFocusActive && edges.some(e => 
-            (e.sourceIndex === focusIdx && e.targetIndex === origIdx) ||
-            (e.targetIndex === focusIdx && e.sourceIndex === origIdx)
-          );
-          const isMatch = searchQuery ? n.name.toLowerCase().includes(searchQuery) : true;
-
-          let r = 5.5;
-          let alpha = 1.0;
-          let nodeColor = n.color || '#FF5400';
-
-          if (isFocusActive) {
-            if (isSelected || isHovered) {
-              r = 8.5;
-              alpha = 1.0;
-            } else if (isConnected) {
-              r = 7.0;
-              alpha = 0.95;
-            } else {
-              alpha = 0.06;
-            }
-          }
-
-          if (!isMatch) alpha = 0.06;
-
-          ctx.globalAlpha = alpha;
-
-          // Node Circle
+          // Pill background behind text prevents collisions!
+          ctx.fillStyle = 'rgba(17, 19, 22, 0.92)';
           ctx.beginPath();
-          ctx.arc(n.x, n.y, r, 0, 2 * Math.PI);
-          ctx.fillStyle = nodeColor;
-          ctx.shadowColor = nodeColor;
-          ctx.shadowBlur = (isSelected || isHovered) ? 12 : 3;
+          ctx.roundRect(n.x + r + 4, n.y - 8, textWidth + 10, 16, 4);
           ctx.fill();
-          ctx.shadowBlur = 0;
 
-          if (isSelected) {
-            ctx.lineWidth = 2.0;
-            ctx.strokeStyle = '#FFFFFF';
-            ctx.stroke();
-          }
+          ctx.strokeStyle = isSelected ? 'var(--accent-orange)' : 'rgba(255,255,255,0.12)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
 
-          // ANTI-COLLISION PILL LABEL (ONLY RENDER IF SELECTED, HOVERED, CONNECTED, OR MAJOR HUB)
-          const shouldShowLabel = isSelected || isHovered || isConnected || (!isFocusActive && currentDensity <= 35);
+          // Text
+          ctx.fillStyle = isSelected ? '#FFFFFF' : (isConnected ? '#FF5400' : '#E2E6ED');
+          ctx.fillText(n.name, n.x + r + 9, n.y + 4);
+        }
 
-          if (shouldShowLabel && alpha > 0.1) {
-            ctx.font = '10px "JetBrains Mono", monospace';
-            const textWidth = ctx.measureText(n.name).width;
+        ctx.globalAlpha = 1.0;
+      });
 
-            // Pill background behind text prevents collisions!
-            ctx.fillStyle = 'rgba(17, 19, 22, 0.88)';
-            ctx.beginPath();
-            ctx.roundRect(n.x + r + 4, n.y - 8, textWidth + 10, 16, 4);
-            ctx.fill();
+      // ZERO UNINTENDED MOVEMENT: NODES REMAIN FIRMLY IN PLACE!
+      ctx.restore();
+    }
 
-            ctx.strokeStyle = isSelected ? 'var(--accent-orange)' : 'rgba(255,255,255,0.1)';
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // Text
-            ctx.fillStyle = isSelected ? '#FFFFFF' : (isConnected ? '#FF5400' : '#E2E6ED');
-            ctx.fillText(n.name, n.x + r + 9, n.y + 4);
-          }
-
-          ctx.globalAlpha = 1.0;
-        });
-
-        // ZERO UNINTENDED MOVEMENT: NODES REMAIN FIRMLY IN PLACE!
-        ctx.restore();
-      }
-
+    let isLoopRunning = false;
+    function startRenderLoop() {
+      if (isLoopRunning) return;
+      isLoopRunning = true;
       setInterval(() => {
-        if (document.getElementById("graph-pane").classList.contains("active")) tick();
+        if (document.getElementById("graph-pane").classList.contains("active")) {
+          tick();
+        }
       }, 30);
     }
 
-    // INTERACTION: PAN, ZOOM, AND INDIVIDUAL NODE DRAGGING
-    const canvasElem = document.getElementById('graph-canvas');
+    async function initGraph() {
+      resizeCanvas();
+      await loadGraphData();
+      startRenderLoop();
+    }
 
+    // INTERACTION: PAN, ZOOM, AND INDIVIDUAL NODE DRAGGING
     canvasElem.addEventListener('mousedown', e => {
       const rect = canvasElem.getBoundingClientRect();
       const mouseX = (e.clientX - rect.left - (canvasElem.width / 2 + panX)) / zoomLevel;
@@ -1908,8 +1953,10 @@ def _get_html_dashboard() -> str:
     });
 
     initDashboard();
+    initGraph();
     window.addEventListener('resize', () => {
-      if (document.getElementById('graph-pane').classList.contains('active')) renderGraph();
+      resizeCanvas();
+      applyLayoutPositions();
     });
   </script>
 </body>
