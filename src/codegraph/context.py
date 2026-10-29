@@ -356,15 +356,17 @@ def get_context(
     max_depth: int | None = None,
     max_package_depth: int | None = None,
     query: str | TaskSpec | dict[str, Any] = "",
+    budget_tokens: int | None = None,
 ) -> ContextPacket:
     """Compile a deterministic, verified ContextPacket for the given query/task and intent."""
     effective_task = _resolve_task_or_query_input(task=task, query=query)
-    if max_tokens <= 0 or max_files <= 0 or max_lines <= 0:
-        raise ValueError("max_tokens, max_files, and max_lines must be positive integers (> 0).")
+    effective_max_tokens = budget_tokens if budget_tokens is not None else max_tokens
+    if effective_max_tokens <= 0 or max_files <= 0 or max_lines <= 0:
+        raise ValueError("max_tokens, budget_tokens, max_files, and max_lines must be positive integers (> 0).")
     governor = get_global_governor()
     coalescer = get_global_coalescer()
     flight_key = (
-        f"{repository}:{effective_task}:{intent}:{max_tokens}:{top_k}:{mode}:{explain}:"
+        f"{repository}:{effective_task}:{intent}:{effective_max_tokens}:{top_k}:{mode}:{explain}:"
         f"{include_generated}:{include_vendor}:{include_bundles}:{include_build_artifacts}:"
         f"{max_symbols}:{max_relationships}:{max_files}:{max_lines}:{max_depth}:{max_package_depth}"
     )
@@ -376,7 +378,7 @@ def get_context(
                 repository=repository,
                 task=effective_task,
                 intent=intent,
-                max_tokens=max_tokens,
+                max_tokens=effective_max_tokens,
                 top_k=top_k,
                 plan=plan,
                 mode=mode,

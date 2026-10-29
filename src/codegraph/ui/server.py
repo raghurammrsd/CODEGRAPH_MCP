@@ -1761,6 +1761,7 @@ def _get_html_dashboard() -> str:
         applyLayoutPositions();
       } catch (err) {
         console.error('Failed to load graph:', err);
+        setTimeout(loadGraphData, 3000);
       }
     }
 
@@ -1817,6 +1818,15 @@ def _get_html_dashboard() -> str:
     function tick() {
       animTime += 0.015;
       ctx.clearRect(0, 0, canvasElem.width, canvasElem.height);
+
+      if (!nodes || nodes.length === 0) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.font = '12px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('CONNECTING TO CODEGRAPH REPOSITORY ENGINE... (PORT 8765)', canvasElem.width / 2, canvasElem.height / 2);
+        ctx.textAlign = 'start';
+        return;
+      }
 
       const centerX = canvasElem.width / 2 + panX;
       const centerY = canvasElem.height / 2 + panY;

@@ -445,6 +445,7 @@ def create_server(
         task: dict[str, Any] | str = "",
         intent: str | None = None,
         max_tokens: int = 4000,
+        budget_tokens: int | None = None,
         max_files: int = 25,
         max_lines: int = 500,
         top_k: int = 25,
@@ -453,16 +454,18 @@ def create_server(
         explain: bool = False,
         resource_mode: str | None = None,
     ) -> dict[str, object]:
-        """Compile a token-bounded, coverage-optimized ContextPacket for a `query` (or `task` alias: natural-language question, symbol/route target, or structured TaskSpec). Enforces strict pre-serialization boundaries (`max_tokens`, `max_files`, `max_lines`) and returns explicit budget metadata (`selected_tokens`, `candidate_tokens`, `selected_files`, `selected_lines`, `coverage_score`, `truncated`). Example: `get_context(query="Trace InventoryService.place_order callers and tests", intent="TRACE", max_tokens=4000, max_files=10, max_lines=300)`."""
+        """Compile a token-bounded, coverage-optimized ContextPacket for a `query` (or `task` alias: natural-language question, symbol/route target, or structured TaskSpec). Enforces strict pre-serialization boundaries (`budget_tokens` / `max_tokens`, `max_files`, `max_lines`) and returns explicit budget metadata (`selected_tokens`, `candidate_tokens`, `selected_files`, `selected_lines`, `coverage_score`, `truncated`). Example: `get_context(query="Trace InventoryService.place_order callers and tests", intent="TRACE", budget_tokens=2000)`."""
         effective_task = _resolve_task_or_query_input(task=task, query=query)
         effective_mode = resource_mode or mode
+        effective_budget = budget_tokens if budget_tokens is not None else max_tokens
         with indexer.session() as con:
             packet = compile_context(
                 con,
                 indexer.repository,
                 task=effective_task,
                 intent=intent,
-                max_tokens=max_tokens,
+                max_tokens=effective_budget,
+                budget_tokens=effective_budget,
                 max_files=max_files,
                 max_lines=max_lines,
                 top_k=top_k,

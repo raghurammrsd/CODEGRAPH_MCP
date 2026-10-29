@@ -66,6 +66,7 @@ LANGUAGES = {
     ".proto": "proto",
     ".graphql": "graphql",
     ".gql": "graphql",
+    ".cs": "csharp",
 }
 
 

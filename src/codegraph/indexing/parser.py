@@ -234,6 +234,9 @@ def parse(content: str, language: str, file_path: str) -> ParseResult:
     if language in ("c", "cpp", "c_header", "cpp_header") or file_path.lower().endswith((".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hxx")):
         from codegraph.indexing.languages.cpp import parse_cpp
         return cast(ParseResult, parse_cpp(content, file_path))
+    if language in ("csharp", "cs") or file_path.lower().endswith(".cs"):
+        from codegraph.indexing.languages.csharp import parse_csharp
+        return cast(ParseResult, parse_csharp(content, file_path))
     if language == "proto" or file_path.lower().endswith(".proto"):
         from codegraph.indexing.protocols import parse_proto
         return cast(ParseResult, parse_proto(content, file_path))
