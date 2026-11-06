@@ -4,7 +4,7 @@ import asyncio
 import functools
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import anyio
 
@@ -1580,7 +1580,19 @@ def create_server(
     elif profile == "developer":
         selected_names = developer_names
     else:
-        selected_names = set(all_tools.keys())
+        from codegraph.agent_capabilities import (
+            MCP_PROFILE_RECOMMENDATIONS,
+            SUBTREE_PROFILES,
+            TOOL_SUBTREES,
+        )
+        if profile in MCP_PROFILE_RECOMMENDATIONS:
+            selected_names = set(cast(list[str], MCP_PROFILE_RECOMMENDATIONS[profile]["included_tools"]))
+        elif profile in SUBTREE_PROFILES:
+            selected_names = set(cast(list[str], SUBTREE_PROFILES[profile]["included_tools"]))
+        elif profile in TOOL_SUBTREES:
+            selected_names = set(cast(list[str], TOOL_SUBTREES[profile]["tools"]))
+        else:
+            selected_names = set(all_tools.keys())
 
     _last_db_sig: list[tuple[int, int, int, int] | None] = [None]
 

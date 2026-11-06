@@ -22,7 +22,7 @@ import re
 import sqlite3
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any
+from typing import Any, cast
 
 from codegraph import __version__
 
@@ -70,11 +70,13 @@ class ToolCapabilitySpec:
     example_request: str = ""
     example_call: str = ""
     example_interpretation: str = ""
+    subtree: str = "01_code_navigation"
 
     def as_dict(self) -> dict[str, object]:
         return {
             "tool_name": self.tool_name,
             "capability": self.capability,
+            "subtree": self.subtree,
             "description": self.description,
             "task_types": list(self.task_types),
             "required_inputs": list(self.required_inputs),
@@ -187,6 +189,181 @@ DEFAULT_AGENT_PROFILE_TOOLS: tuple[str, ...] = (
     "trace_path",
     "trace_flow",
 )
+
+
+# ---------------------------------------------------------------------------
+# Hierarchical Tool Subtrees (8 Structured Categories for All 97 Tools)
+# ---------------------------------------------------------------------------
+
+TOOL_SUBTREES: dict[str, dict[str, Any]] = {
+    "01_code_navigation": {
+        "id": "01_code_navigation",
+        "name": "Code & Symbol Navigation",
+        "description": "Deterministic AST symbol resolution, exact file inspection, and token search",
+        "tool_count": 12,
+        "tools": [
+            "batch_get_symbols",
+            "find_symbol",
+            "get_file",
+            "get_file_history",
+            "get_file_symbols",
+            "get_symbol",
+            "read_file",
+            "resolve_polymorphic_callees",
+            "resolve_symbol",
+            "search_code",
+            "search_symbols",
+            "trace_symbol_history",
+        ],
+    },
+    "02_graph_traversal": {
+        "id": "02_graph_traversal",
+        "name": "Graph & Call Traversal",
+        "description": "Caller/callee discovery, reference tracking, and graph pathfinding",
+        "tool_count": 17,
+        "tools": [
+            "batch_find_callers",
+            "fast_graph_path",
+            "find_callees",
+            "find_callers",
+            "find_references",
+            "get_call_graph",
+            "get_callees",
+            "get_callers",
+            "get_dependencies",
+            "get_dependency_graph",
+            "get_dependents",
+            "get_graph",
+            "get_imports",
+            "get_references",
+            "trace_call",
+            "trace_flow",
+            "trace_path",
+        ],
+    },
+    "03_database_intelligence": {
+        "id": "03_database_intelligence",
+        "name": "Database & ORM Intelligence",
+        "description": "SQL tables, columns, ORM models, queries, readers, writers, and DB schema impact",
+        "tool_count": 11,
+        "tools": [
+            "find_db_callers",
+            "find_db_columns",
+            "find_db_models",
+            "find_db_queries",
+            "find_db_readers",
+            "find_db_relationships",
+            "find_db_tables",
+            "find_db_writers",
+            "get_db_impact",
+            "get_db_schema",
+            "get_db_table",
+        ],
+    },
+    "04_routes_and_tests": {
+        "id": "04_routes_and_tests",
+        "name": "Routing, Frameworks & Test Discovery",
+        "description": "HTTP route detection, cross-repo mounts, API drift checks, and test suites",
+        "tool_count": 9,
+        "tools": [
+            "check_api_drift",
+            "check_route_schema_drift",
+            "find_cross_repo_routes",
+            "find_related_tests",
+            "find_routes",
+            "find_tests",
+            "generate_test_scaffolding",
+            "get_live_services",
+            "list_routes",
+        ],
+    },
+    "05_git_and_blast_radius": {
+        "id": "05_git_and_blast_radius",
+        "name": "Git & Blast Radius Impact",
+        "description": "Semantic diffs, change impact analysis, PR reviews, merge conflict detection, and CVE impact",
+        "tool_count": 11,
+        "tools": [
+            "analyze_change_impact",
+            "analyze_impact",
+            "analyze_supply_chain_cve_impact",
+            "compare_git",
+            "detect_semantic_conflicts",
+            "generate_pr_review",
+            "generate_semantic_changelog",
+            "get_change_impact",
+            "get_git_impact",
+            "get_git_state",
+            "get_recent_changes",
+        ],
+    },
+    "06_security_and_architecture": {
+        "id": "06_security_and_architecture",
+        "name": "Security, Taint & Architectural Governance",
+        "description": "SAST taint propagation, architectural rules, dead code detection, and monorepo boundaries",
+        "tool_count": 8,
+        "tools": [
+            "analyze_dataflow_taint",
+            "find_dead_code",
+            "find_unreachable_code",
+            "get_architecture",
+            "get_monorepo_packages",
+            "get_project_structure",
+            "propagate_interprocedural_dataflow",
+            "verify_architectural_rules",
+        ],
+    },
+    "07_refactoring_and_patches": {
+        "id": "07_refactoring_and_patches",
+        "name": "Safe Refactoring & Transactions",
+        "description": "Multi-file AST safe renames, speculative patch previews, application, and rollback",
+        "tool_count": 5,
+        "tools": [
+            "apply_semantic_patch",
+            "evaluate_speculative_patch",
+            "preview_semantic_patch",
+            "rollback_refactor",
+            "safe_rename",
+        ],
+    },
+    "08_multi_agent_and_system": {
+        "id": "08_multi_agent_and_system",
+        "name": "Multi-Agent Swarm, Memory & Engine Health",
+        "description": "File lease coordination, agent memory store, context compilation, runtime trace ingestion, and self-healing",
+        "tool_count": 24,
+        "tools": [
+            "batch_get_context",
+            "check_context_freshness",
+            "check_db_drift",
+            "claim_file_lease",
+            "compile_task",
+            "federate_repositories",
+            "get_context",
+            "get_distributed_trace",
+            "get_evidence",
+            "get_lsp_diagnostics",
+            "get_multi_agent_status",
+            "get_repository_status",
+            "get_resource_status",
+            "get_runtime_trace",
+            "ingest_runtime_traces",
+            "plan_retrieval",
+            "query_agent_memory",
+            "reconcile_static_runtime",
+            "register_agent_session",
+            "release_file_lease",
+            "repair_repository_index",
+            "search_memory",
+            "store_agent_memory",
+            "verify_evidence",
+        ],
+    },
+}
+
+TOOL_TO_SUBTREE_MAP: dict[str, str] = {
+    t: cat_id
+    for cat_id, cat_info in TOOL_SUBTREES.items()
+    for t in cat_info["tools"]
+}
 
 
 # ---------------------------------------------------------------------------
@@ -4278,6 +4455,51 @@ MCP_PROFILE_RECOMMENDATIONS: dict[str, dict[str, object]] = {
         "tool_count": len(TOOL_CAPABILITY_REGISTRY),
         "recommended_for": "Complete diagnostic, database intelligence, runtime reconciliation, benchmark, and repository administration sessions",
         "included_tools": sorted(spec.tool_name for spec in TOOL_CAPABILITY_REGISTRY),
+    },
+}
+
+SUBTREE_PROFILES: dict[str, dict[str, Any]] = {
+    "tree_navigation": {
+        "profile": "tree_navigation",
+        "tool_count": len(cast(list[str], TOOL_SUBTREES["01_code_navigation"]["tools"])) + len(cast(list[str], TOOL_SUBTREES["02_graph_traversal"]["tools"])),
+        "recommended_for": "Subtree 01 & 02: Code navigation, symbol lookup, caller/callee traversal, and path tracing",
+        "included_tools": sorted(set(cast(list[str], TOOL_SUBTREES["01_code_navigation"]["tools"])) | set(cast(list[str], TOOL_SUBTREES["02_graph_traversal"]["tools"]))),
+    },
+    "tree_database": {
+        "profile": "tree_database",
+        "tool_count": len(cast(list[str], TOOL_SUBTREES["03_database_intelligence"]["tools"])),
+        "recommended_for": "Subtree 03: SQL schemas, ORM models, tables, columns, readers, writers, and DB impact",
+        "included_tools": sorted(cast(list[str], TOOL_SUBTREES["03_database_intelligence"]["tools"])),
+    },
+    "tree_routes_and_tests": {
+        "profile": "tree_routes_and_tests",
+        "tool_count": len(cast(list[str], TOOL_SUBTREES["04_routes_and_tests"]["tools"])),
+        "recommended_for": "Subtree 04: HTTP routes, API drift, cross-repo endpoints, and related test discovery",
+        "included_tools": sorted(cast(list[str], TOOL_SUBTREES["04_routes_and_tests"]["tools"])),
+    },
+    "tree_git_and_impact": {
+        "profile": "tree_git_and_impact",
+        "tool_count": len(cast(list[str], TOOL_SUBTREES["05_git_and_blast_radius"]["tools"])),
+        "recommended_for": "Subtree 05: Blast radius, Git diffs, PR reviews, merge conflict checks, and CVE impact",
+        "included_tools": sorted(cast(list[str], TOOL_SUBTREES["05_git_and_blast_radius"]["tools"])),
+    },
+    "tree_security_and_arch": {
+        "profile": "tree_security_and_arch",
+        "tool_count": len(cast(list[str], TOOL_SUBTREES["06_security_and_architecture"]["tools"])),
+        "recommended_for": "Subtree 06: Dataflow taint analysis, architectural boundary enforcement, and dead code detection",
+        "included_tools": sorted(cast(list[str], TOOL_SUBTREES["06_security_and_architecture"]["tools"])),
+    },
+    "tree_refactoring": {
+        "profile": "tree_refactoring",
+        "tool_count": len(cast(list[str], TOOL_SUBTREES["07_refactoring_and_patches"]["tools"])),
+        "recommended_for": "Subtree 07: AST safe rename, speculative patch previews, patch application, and atomic rollback",
+        "included_tools": sorted(cast(list[str], TOOL_SUBTREES["07_refactoring_and_patches"]["tools"])),
+    },
+    "tree_multi_agent": {
+        "profile": "tree_multi_agent",
+        "tool_count": len(cast(list[str], TOOL_SUBTREES["08_multi_agent_and_system"]["tools"])),
+        "recommended_for": "Subtree 08: Multi-agent swarm concurrency, file leases, agent memory, context synthesis, and self-healing",
+        "included_tools": sorted(cast(list[str], TOOL_SUBTREES["08_multi_agent_and_system"]["tools"])),
     },
 }
 

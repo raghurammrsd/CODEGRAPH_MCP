@@ -246,7 +246,14 @@ def _search_repository_text_files(
     except Exception:
         pass
 
-    skip_dirs = set(IGNORED_DIRS)
+    # Preload indexed files to avoid redundant re-reading of files already covered by FTS5 chunks
+    indexed_paths: set[str] = set()
+    try:
+        indexed_paths = {str(r["path"]) for r in con.execute("SELECT path FROM files WHERE status='ok'").fetchall()}
+    except Exception:
+        pass
+
+    skip_dirs = set(IGNORED_DIRS) | {"__pycache__"}
     if include_vendor:
         skip_dirs -= {"node_modules", "vendor", ".venv", "venv"}
     if include_build_artifacts:
@@ -257,10 +264,10 @@ def _search_repository_text_files(
     for directory, dirs, files in os.walk(repo_root, followlinks=False):
         dirs[:] = sorted(
             d for d in dirs
-            if d not in skip_dirs and not d.startswith(".codegraph")
+            if d not in skip_dirs and not d.startswith(".codegraph") and not d.startswith(".")
         )
         for filename in sorted(files):
-            if filename.startswith(".codegraph"):
+            if filename.startswith(".codegraph") or filename.startswith("."):
                 continue
             absolute = Path(directory) / filename
             try:
@@ -279,7 +286,7 @@ def _search_repository_text_files(
                 continue
 
             rel_posix = relative.as_posix()
-            if is_sensitive_path(relative):
+            if rel_posix in indexed_paths or is_sensitive_path(relative):
                 continue
 
             suffix_lower = relative.suffix.lower()
