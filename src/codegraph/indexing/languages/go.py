@@ -150,8 +150,8 @@ def parse_go(content: str, file_path: str) -> Any:
     active_scope: tuple[str, str, int] | None = None
 
     # Regex definitions
-    struct_re = re.compile(r"^\s*type\s+([A-Z][A-Za-z0-9_]*)\s+struct\b")
-    interface_re = re.compile(r"^\s*type\s+([A-Z][A-Za-z0-9_]*)\s+interface\b")
+    struct_re = re.compile(r"^\s*type\s+([A-Za-z_][A-Za-z0-9_]*)\s+struct\b")
+    interface_re = re.compile(r"^\s*type\s+([A-Za-z_][A-Za-z0-9_]*)\s+interface\b")
     method_re = re.compile(r"^\s*func\s*\(\s*(?:[A-Za-z0-9_]+\s+)?\*?([A-Za-z0-9_]+)\s*\)\s*([A-Za-z0-9_]+)\s*\((.*?)\)(.*)")
     func_re = re.compile(r"^\s*func\s+([A-Za-z0-9_]+)\s*\((.*?)\)(.*)")
 
@@ -346,6 +346,13 @@ def parse_go(content: str, file_path: str) -> Any:
             handler = m_gin.group(4).split(".")[-1]
             mount_prefix = router_groups.get(router_var, "")
             full_route_path = join_route_prefixes(mount_prefix, sub_path)
+            if handler == "func":
+                base_f = file_path.split("/")[-1]
+                handler_nm = f"{base_f}:L{lineno}(anonymous)"
+                handler_canon = f"go:{pkg_name}:{base_f}:L{lineno}:anonymous"
+            else:
+                handler_nm = handler
+                handler_canon = f"go:{pkg_name}:{handler}"
 
             routes.append(
                 RouteDetection(
@@ -353,8 +360,8 @@ def parse_go(content: str, file_path: str) -> Any:
                     http_method=method,
                     route_path=full_route_path,
                     normalized_route=re.sub(r":\w+", "*", full_route_path),
-                    handler_name=handler,
-                    handler_canonical_id=f"go:{pkg_name}:{handler}",
+                    handler_name=handler_nm,
+                    handler_canonical_id=handler_canon,
                     file_path=file_path,
                     line=lineno,
                     confidence="HIGH",
@@ -371,6 +378,13 @@ def parse_go(content: str, file_path: str) -> Any:
             handler = m_chi.group(4).split(".")[-1]
             mount_prefix = router_groups.get(router_var, "")
             full_route_path = join_route_prefixes(mount_prefix, sub_path)
+            if handler == "func":
+                base_f = file_path.split("/")[-1]
+                handler_nm = f"{base_f}:L{lineno}(anonymous)"
+                handler_canon = f"go:{pkg_name}:{base_f}:L{lineno}:anonymous"
+            else:
+                handler_nm = handler
+                handler_canon = f"go:{pkg_name}:{handler}"
 
             routes.append(
                 RouteDetection(
@@ -378,8 +392,8 @@ def parse_go(content: str, file_path: str) -> Any:
                     http_method=method,
                     route_path=full_route_path,
                     normalized_route=re.sub(r"\{[^}]+\}", "*", full_route_path),
-                    handler_name=handler,
-                    handler_canonical_id=f"go:{pkg_name}:{handler}",
+                    handler_name=handler_nm,
+                    handler_canonical_id=handler_canon,
                     file_path=file_path,
                     line=lineno,
                     confidence="HIGH",
@@ -392,14 +406,21 @@ def parse_go(content: str, file_path: str) -> Any:
         if m_http:
             route_path = m_http.group(1)
             handler = m_http.group(2).split(".")[-1]
+            if handler == "func":
+                base_f = file_path.split("/")[-1]
+                handler_nm = f"{base_f}:L{lineno}(anonymous)"
+                handler_canon = f"go:{pkg_name}:{base_f}:L{lineno}:anonymous"
+            else:
+                handler_nm = handler
+                handler_canon = f"go:{pkg_name}:{handler}"
             routes.append(
                 RouteDetection(
                     framework="net/http",
                     http_method="ANY",
                     route_path=route_path,
                     normalized_route=route_path,
-                    handler_name=handler,
-                    handler_canonical_id=f"go:{pkg_name}:{handler}",
+                    handler_name=handler_nm,
+                    handler_canonical_id=handler_canon,
                     file_path=file_path,
                     line=lineno,
                     confidence="HIGH",

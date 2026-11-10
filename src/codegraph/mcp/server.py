@@ -982,8 +982,10 @@ def create_server(
         with indexer.session() as con:
             return detect_schema_drift(con, indexer.repository).as_dict()
 
-    def get_distributed_trace(trace_id: str) -> dict[str, Any]:
+    def get_distributed_trace(trace_id: str = "") -> dict[str, Any]:
         """Stitch and reconstruct multi-service distributed execution trees across frontend, backend, and database boundaries for a specific W3C trace ID. Use when tracing cross-service requests or debugging multi-service latency bottlenecks. Does not capture unobserved code paths or untraced sidecar requests."""
+        if not trace_id:
+            return {"status": "not_found", "trace_id": "", "error": "trace_id is required"}
         from codegraph.runtime.trace_linker import link_distributed_trace
         with indexer.session() as con:
             res = link_distributed_trace(con, indexer.repository, trace_id)
@@ -1112,7 +1114,7 @@ def create_server(
             return result.to_dict()
 
     def rollback_refactor(
-        transaction_id: str,
+        transaction_id: str = "",
     ) -> dict[str, Any]:
         """Atomically rollback an applied refactoring transaction using its rollback manifest ID.
         Verifies that files on disk have not been modified externally since the refactor before restoring original contents."""
@@ -1130,9 +1132,11 @@ def create_server(
                 pass
         return result.to_dict()
 
-    def batch_get_symbols(symbols: list[str]) -> dict[str, Any]:
+    def batch_get_symbols(symbols: list[str] | None = None) -> dict[str, Any]:
         """Retrieve declaration metadata, signature, kind, and source snippet for multiple symbols in a single round-trip.
         Reduces LLM latency and tool call overhead when inspecting multiple related symbols. Bounded to 50 symbols max."""
+        if not symbols:
+            return {"results": {}, "count": 0, "found_count": 0}
         bounded_symbols = symbols[:50]
         results: dict[str, Any] = {}
         with indexer.session() as con:
@@ -1147,9 +1151,11 @@ def create_server(
             "found_count": sum(1 for r in results.values() if r.get("status") != "NOT_FOUND"),
         }
 
-    def batch_find_callers(symbols: list[str], max_results_per_symbol: int = 10) -> dict[str, Any]:
+    def batch_find_callers(symbols: list[str] | None = None, max_results_per_symbol: int = 10) -> dict[str, Any]:
         """Find functions and methods calling each of the specified symbols in a single round-trip.
         Reduces multi-hop turn count for AI coding agents. Bounded to 30 symbols max."""
+        if not symbols:
+            return {"results": {}, "count": 0, "total_callers": 0}
         bounded_symbols = symbols[:30]
         results: dict[str, Any] = {}
         with indexer.session() as con:
@@ -1165,11 +1171,15 @@ def create_server(
         }
 
     def batch_get_context(
-        tasks: list[dict[str, Any]] | list[str],
+        tasks: list[dict[str, Any]] | list[str] | None = None,
         max_tokens_per_task: int = 2000,
     ) -> dict[str, Any]:
         """Compile token-bounded, coverage-optimized ContextPackets for multiple task prompts or symbol targets in a single call.
         Enables agents to retrieve separate contexts for different sub-tasks in one request. Bounded to 5 tasks max."""
+        if not tasks:
+            return {"results": [], "count": 0, "error": "No tasks provided"}
+        if isinstance(tasks, str):
+            tasks = [tasks]
         bounded_tasks = tasks[:5]
         results: list[dict[str, Any]] = []
         with indexer.session() as con:
@@ -1191,7 +1201,7 @@ def create_server(
         }
 
     def preview_semantic_patch(
-        patches: list[dict[str, Any]],
+        patches: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         """Dry-run preview a multi-file semantic patch across repository files with syntax validation and unified diffs.
         Invariants: Zero disk mutation; pre-flight AST validation for Python, Luau, JSON, and JS/TS; boundary checks. Does not commit modifications to disk."""
@@ -1199,12 +1209,12 @@ def create_server(
 
         result = do_preview(
             repository=indexer.repository,
-            patch_specs=patches,
+            patch_specs=patches or [],
         )
         return result.to_dict()
 
     def apply_semantic_patch(
-        patches: list[dict[str, Any]],
+        patches: list[dict[str, Any]] | None = None,
         dry_run: bool = False,
     ) -> dict[str, Any]:
         """Atomically apply a multi-file semantic patch with pre-flight syntax validation and rollback support.
@@ -1214,7 +1224,7 @@ def create_server(
 
         result = do_apply(
             repository=indexer.repository,
-            patch_specs=patches,
+            patch_specs=patches or [],
             dry_run=dry_run,
         )
         if result.status == RefactorStatus.APPLIED:
@@ -1350,9 +1360,29 @@ def create_server(
             rep.conflicts_count = len(conflicts)
             return rep.as_dict()
 
-    def evaluate_speculative_patch(patches: dict[str, str]) -> dict[str, Any]:
+    def evaluate_speculative_patch(patches: dict[str, str] | list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """Project an in-memory virtual AST branch in RAM to evaluate caller breakages, parameter mismatches, and route mutations without modifying disk files. Use before writing refactoring patches. Does not modify disk files."""
+        from codegraph.sandbox import SpeculativeEvaluationReport
         from codegraph.sandbox import evaluate_speculative_patch as impl_sandbox
+        if patches is None:
+            return SpeculativeEvaluationReport(is_safe=True, diff_summary="No patches provided").as_dict()
+        normalized_patches: dict[str, str] = {}
+        if isinstance(patches, list):
+            for p in patches:
+                if isinstance(p, dict):
+                    pth = p.get("path") or p.get("file_path") or p.get("file") or ""
+                    cnt = p.get("content") or p.get("new_content") or p.get("patch") or ""
+                    if pth:
+                        normalized_patches[str(pth)] = str(cnt)
+            patches = normalized_patches
+        elif isinstance(patches, dict):
+            patches = {str(k): str(v) for k, v in patches.items()}
+        else:
+            return SpeculativeEvaluationReport(is_safe=True, diff_summary="Invalid patch format").as_dict()
+
+        if not patches:
+            return SpeculativeEvaluationReport(is_safe=True, diff_summary="No patches to evaluate").as_dict()
+
         with indexer.session() as con:
             return impl_sandbox(indexer.repository, file_patches=patches, con=con).as_dict()
 
@@ -1373,8 +1403,10 @@ def create_server(
         from codegraph.changelog import generate_semantic_changelog as impl_changelog
         return impl_changelog(indexer.repository, base_ref=base_ref, head_ref=head_ref).as_dict()
 
-    def fast_graph_path(start_node: str, end_node: str) -> dict[str, Any]:
+    def fast_graph_path(start_node: str = "", end_node: str = "") -> dict[str, Any]:
         """Compute microsecond BFS shortest path between two symbols using the Compressed Sparse Row (CSR) binary graph. Use for instant path tracing between caller and callee. Does not modify graph."""
+        if not start_node or not end_node:
+            return {"start_node": start_node, "end_node": end_node, "path": [], "length": 0, "error": "Both start_node and end_node are required"}
         from codegraph.graph_csr import CSRGraph
         with indexer.session() as con:
             cur = con.cursor()
@@ -1384,8 +1416,16 @@ def create_server(
         path = csr.shortest_path(start_node, end_node)
         return {"start_node": start_node, "end_node": end_node, "path": path, "length": len(path) if path else 0}
 
-    def resolve_polymorphic_callees(interface_symbol: str, method_name: str) -> dict[str, Any]:
+    def resolve_polymorphic_callees(interface_symbol: str = "", method_name: str = "") -> dict[str, Any]:
         """Resolve an abstract interface method or trait invocation to all concrete implementing classes in the workspace. Use when tracing dynamic dispatch or trait method implementations. Does not execute code."""
+        if not interface_symbol or not method_name:
+            return {
+                "interface_symbol": interface_symbol,
+                "method_name": method_name,
+                "total_implementations": 0,
+                "implementations": [],
+                "error": "Both interface_symbol and method_name are required",
+            }
         from codegraph.polymorphism import resolve_polymorphic_callees as impl_poly
         with indexer.session() as con:
             return impl_poly(con, interface_symbol=interface_symbol, method_name=method_name).as_dict()

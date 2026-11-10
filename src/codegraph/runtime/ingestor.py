@@ -428,11 +428,14 @@ def ingest_runtime_traces(
             try:
                 raw_payload = json.loads(file_text)
             except json.JSONDecodeError:
-                jsonl_list = [
-                    json.loads(ln)
-                    for ln in file_text.splitlines()
-                    if ln.strip().startswith("{")
-                ]
+                jsonl_list: list[dict[str, Any]] = []
+                for ln in file_text.splitlines():
+                    ln_s = ln.strip()
+                    if ln_s.startswith("{"):
+                        try:
+                            jsonl_list.append(json.loads(ln_s))
+                        except json.JSONDecodeError:
+                            pass
                 raw_payload = jsonl_list if jsonl_list else file_text
 
     # Parse into RuntimeEvent list based on format

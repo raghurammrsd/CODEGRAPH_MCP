@@ -56,7 +56,7 @@ def test_mcp_tool_schemas_and_direct_calls(tmp_path: Path) -> None:
 async def _protocol_flow(repo: Path) -> None:
     params = StdioServerParameters(
         command=sys.executable,
-        args=["-m", "codegraph.cli", "serve", "-r", str(repo)],
+        args=["-m", "codegraph.cli", "serve", "-r", str(repo), "--profile", "full"],
     )
     async with stdio_client(params) as (reader, writer):
         async with ClientSession(reader, writer) as session:

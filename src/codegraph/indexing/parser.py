@@ -2533,13 +2533,15 @@ def _py_imports_fallback(content: str, file_path: str) -> list[ImportRef]:
 
 _JS_CLASS_RE = re.compile(
     r"\b(?:export\s+(?:default\s+)?)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)"
-    r"(?:\s+extends\s+([A-Za-z_$][\w$.]*))?"
-    r"(?:\s+implements\s+([A-Za-z_$][\w$.,\s]*))?\s*\{"
+    r"(?:\s*<[^{\n]+?>)?"
+    r"(?:\s+extends\s+([A-Za-z_$][\w$.]*)(?:\s*<[^{\n]+?>)?)?"
+    r"(?:\s+implements\s+([A-Za-z_$][\w$.,\s<>]*))?\s*(?:\{|$)"
 )
 
 _TS_INTERFACE_RE = re.compile(
     r"\b(?:export\s+(?:default\s+)?)?interface\s+([A-Za-z_$][\w$]*)"
-    r"(?:\s+extends\s+([A-Za-z_$][\w$.,\s]*))?"
+    r"(?:\s*<[^{\n]+?>)?"
+    r"(?:\s+extends\s+([A-Za-z_$][\w$.,\s<>]*))?"
 )
 
 _TS_TYPE_RE = re.compile(
@@ -2581,6 +2583,9 @@ _JS_REEXPORT_ALL = re.compile(
 )
 _JS_NEW_ASSIGN = re.compile(
     r"""(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*new\s+([A-Za-z_$][\w$.]*)\s*\("""
+)
+_JS_NEW_CALL = re.compile(
+    r"""\bnew\s+([A-Za-z_$][\w$.]*)\s*\("""
 )
 _JS_CALL_SITE = re.compile(
     r"""(?<!function\s)(?<!new\s)\b(?:([A-Za-z_$][\w$]*)\.)?([A-Za-z_$][\w$]*)\s*\("""
@@ -3326,6 +3331,24 @@ def _parse_js_ts(content: str, language: str, file_path: str) -> ParseResult:
                         caller_symbol=caller_qname,
                         caller_canonical_id=caller_canon,
                         receiver=resolved_recv,
+                    )
+                )
+
+            for nm in _JS_NEW_CALL.finditer(line):
+                new_target = nm.group(1).split(".")[-1]
+                if new_target in _JS_KEYWORDS_AND_BUILTINS:
+                    continue
+                calls.append(
+                    CallRef(
+                        callee=new_target,
+                        qualified_callee=nm.group(1),
+                        line=lineno,
+                        end_line=lineno,
+                        source_file=file_path,
+                        confidence="LOW",
+                        caller_symbol=caller_qname,
+                        caller_canonical_id=caller_canon,
+                        receiver=None,
                     )
                 )
 

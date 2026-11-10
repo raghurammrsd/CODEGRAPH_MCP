@@ -423,6 +423,9 @@ _LUA_RETURN_FREEZE_RE = re.compile(
 _LUA_RETURN_IDENT_RE = re.compile(
     r"^\s*return\s+([A-Za-z_][\w.]*)\s*$"
 )
+_LUA_RETURN_FUNC_RE = re.compile(
+    r"^\s*return\s+function\s*\(([^)]*)\)"
+)
 _LUA_REQUIRE_ASSIGN_RE = re.compile(
     r"^\s*(?:local\s+)?([A-Za-z_]\w*)\s*(?::\s*[^=]+)?=\s*require\(\s*([^)]+?)\s*\)"
 )
@@ -1171,6 +1174,47 @@ def parse_luau(content: str, file_path: str) -> ParseResult:
                         scope="",
                         expr_kind="ROBLOX_MODULE_EXPORT",
                         source_expr=exp_ident,
+                        base_expr=module,
+                    )
+                )
+            continue
+
+        m_ret_fn = _LUA_RETURN_FUNC_RE.match(line)
+        if m_ret_fn and not active_func:
+            stem = Path(file_path).stem
+            if stem and stem not in exports:
+                exports.append(stem)
+                end_ln = _estimate_luau_block_end(lines, idx)
+                canon_id = build_canonical_id(module, "", stem)
+                if canon_id not in seen_canonical:
+                    seen_canonical.add(canon_id)
+                    params_str = m_ret_fn.group(1) or ""
+                    symbols.append(
+                        Symbol(
+                            id=canon_id,
+                            canonical_id=canon_id,
+                            name=stem,
+                            qualified_name=f"{module}.{stem}" if module else stem,
+                            kind="function",
+                            language="luau",
+                            module=module,
+                            path=file_path,
+                            file_path=file_path,
+                            scope="",
+                            signature=f"function {stem}({params_str})",
+                            start_line=lineno,
+                            end_line=end_ln,
+                            content_hash=_normalized_body_hash(lines, lineno, end_ln),
+                        )
+                    )
+                bindings.append(
+                    BindingRef(
+                        target_name=stem,
+                        file_path=file_path,
+                        line=lineno,
+                        scope="",
+                        expr_kind="ROBLOX_MODULE_EXPORT",
+                        source_expr="anonymous_function",
                         base_expr=module,
                     )
                 )

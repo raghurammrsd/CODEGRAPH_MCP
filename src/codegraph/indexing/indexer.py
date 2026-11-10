@@ -867,6 +867,12 @@ class Indexer:
                             con.commit()
                             telemetry.batch_commits += 1
                             telemetry.observe_wal(self.db_path)
+                            try:
+                                con.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                                telemetry.wal_checkpoints += 1
+                            except sqlite3.OperationalError:
+                                pass
+                            telemetry.observe_wal(self.db_path)
                             uncommitted_in_batch = 0
                             if progress_callback is not None:
                                 progress_callback("ast_parsing", idx + 1, total_files, telemetry)
