@@ -172,6 +172,28 @@ def test_agent_profile_exposes_14_canonical_tools(polyglot_repo: Path) -> None:
     assert set(srv_default._tool_manager._tools.keys()) == set(DEFAULT_AGENT_PROFILE_TOOLS)
 
 
+def test_core12_profile_exposes_12_opinionated_tools(polyglot_repo: Path) -> None:
+    """`create_server(profile='core12')` exposes the exact 12 opinionated tools requested by AI pair programmers."""
+    srv_12 = create_server(polyglot_repo, profile="core12")
+    tools_12 = set(srv_12._tool_manager._tools.keys())
+    expected_12 = {
+        "find_symbol",
+        "get_callers",
+        "get_callees",
+        "find_routes",
+        "read_file_range",
+        "get_file_outline",
+        "analyze_change_impact",
+        "find_db_models",
+        "get_schema_impact",
+        "find_tests_for_symbol",
+        "safe_rename_symbol",
+        "get_architecture_summary",
+    }
+    assert tools_12 == expected_12
+    assert len(tools_12) == 12
+
+
 def test_clean_tool_names_and_backward_compatible_aliases(polyglot_repo: Path) -> None:
     """Canonical `symbol` and backward-compatible `canonical_id` resolve to the exact same result across tools."""
     srv = create_server(polyglot_repo, profile="full")

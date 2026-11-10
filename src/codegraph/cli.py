@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -1009,7 +1010,7 @@ def _run_server(
 def serve(
     path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
     repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
-    profile: Annotated[str, typer.Option("--profile", help="Tool profile: agent | core | graph | minimal | developer | full")] = "agent",
+    profile: Annotated[str, typer.Option("--profile", help="Tool profile: core12 | agent | core | graph | minimal | developer | full")] = os.getenv("CODEGRAPH_PROFILE", "agent"),
     transport: Annotated[str, typer.Option("--transport", "-t", help="MCP transport: stdio | sse")] = "stdio",
     host: Annotated[str, typer.Option("--host", help="Host for SSE server")] = "127.0.0.1",
     port: Annotated[int, typer.Option("--port", "-p", help="Port for SSE server")] = 8765,
@@ -1026,7 +1027,7 @@ app.add_typer(mcp_app, name="mcp")
 def mcp_serve(
     path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
     repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
-    profile: Annotated[str, typer.Option("--profile", help="Tool profile: agent | core | graph | minimal | developer | full")] = "agent",
+    profile: Annotated[str, typer.Option("--profile", help="Tool profile: core12 | agent | core | graph | minimal | developer | full")] = os.getenv("CODEGRAPH_PROFILE", "agent"),
     transport: Annotated[str, typer.Option("--transport", "-t", help="MCP transport: stdio | sse")] = "stdio",
     host: Annotated[str, typer.Option("--host", help="Host for SSE server")] = "127.0.0.1",
     port: Annotated[int, typer.Option("--port", "-p", help="Port for SSE server")] = 8765,

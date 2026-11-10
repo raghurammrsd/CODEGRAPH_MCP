@@ -1444,6 +1444,60 @@ def create_server(
         with indexer.session() as con:
             return impl_supply(indexer.repository, con=con, target_package=target_package).as_dict()
 
+    def read_file_range(path: str = "", start_line: int = 1, end_line: int = 200, file_path: str = "") -> dict[str, Any]:
+        """Read a bounded range of lines from a file without loading the entire file into context.
+        Use when inspecting specific code implementations or bounded slices. Does not modify files."""
+        target = path or file_path
+        return get_file(path=target, start_line=start_line, end_line=end_line)
+
+    def get_file_outline(path: str = "", file_path: str = "") -> dict[str, Any]:
+        """Extract structural outline of a file: classes, functions, methods, routes, and line numbers.
+        Use to understand high-level file layout and structure before reading specific line ranges. Does not execute code."""
+        target = path or file_path
+        if not target:
+            return {"path": "", "symbols": [], "count": 0, "error": "path is required"}
+        symbols = get_file_symbols(path=target)
+        return {"path": target, "symbols": symbols, "count": len(symbols)}
+
+    def get_schema_impact(table: str = "", column: str = "") -> dict[str, Any]:
+        """Analyze blast radius of database schema mutations, column alters, or migration drifts across code models and routes.
+        Use when altering database columns or reviewing migration safety. Does not mutate database."""
+        if table:
+            return get_db_impact(table=table, column=column)
+        from codegraph.runtime.db_watcher import detect_schema_drift
+        with indexer.session() as con:
+            return detect_schema_drift(con, indexer.repository).as_dict()
+
+    def find_tests_for_symbol(symbol: str = "", name: str = "", target: str = "") -> list[dict[str, Any]]:
+        """Discover all unit, integration, and end-to-end tests covering a target function, method, or class.
+        Use when verifying test coverage before or after code refactoring. Does not execute test suites."""
+        effective_symbol = symbol or name or target
+        return find_tests(symbol=effective_symbol)
+
+    def safe_rename_symbol(
+        symbol: str = "",
+        new_name: str = "",
+        target: str = "",
+        dry_run: bool = True,
+        force_uncertain: bool = False,
+    ) -> dict[str, Any]:
+        """Safely perform AST-verified symbol renaming across all project references and declaration sites.
+        Verifies reference confidence before mutating code. Defaults to dry_run=True for safe preview."""
+        effective_target = symbol or target
+        if not effective_target or not new_name:
+            return {"status": "ERROR", "error": "Both symbol and new_name are required"}
+        return safe_rename(
+            target=effective_target,
+            new_name=new_name,
+            dry_run=dry_run,
+            force_uncertain=force_uncertain,
+        )
+
+    def get_architecture_summary() -> dict[str, Any]:
+        """Synthesize high-level architectural summary of the repository: frameworks, modules, entrypoints, and technology stack.
+        Use when onboarding or orienting to a new codebase. Does not modify repository."""
+        return get_architecture()
+
     core_tools: dict[str, Any] = {
         "resolve_symbol": resolve_symbol,
         "search_symbols": search_symbols,
@@ -1613,7 +1667,24 @@ def create_server(
         "analyze_change_impact",
     }
 
-    if profile in ("agent", "default"):
+    core12_tools: dict[str, Any] = {
+        "find_symbol": find_symbol,
+        "get_callers": get_callers,
+        "get_callees": get_callees,
+        "find_routes": find_routes,
+        "read_file_range": read_file_range,
+        "get_file_outline": get_file_outline,
+        "analyze_change_impact": analyze_change_impact,
+        "find_db_models": find_db_models,
+        "get_schema_impact": get_schema_impact,
+        "find_tests_for_symbol": find_tests_for_symbol,
+        "safe_rename_symbol": safe_rename_symbol,
+        "get_architecture_summary": get_architecture_summary,
+    }
+
+    if profile in ("core12", "12", "opinionated", "slim"):
+        selected_names = set(core12_tools.keys())
+    elif profile in ("agent", "default"):
         selected_names = agent_names
     elif profile == "core":
         selected_names = core_names
@@ -1667,8 +1738,9 @@ def create_server(
             return True
         return False
 
+    available_tool_pool: dict[str, Any] = {**all_tools, **core12_tools}
     for tool_name in sorted(selected_names):
-        target_fn: Any = all_tools[tool_name]
+        target_fn: Any = available_tool_pool[tool_name]
 
         def _make_guarded(fn: Any) -> Any:
             import inspect
