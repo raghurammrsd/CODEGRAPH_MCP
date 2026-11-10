@@ -11,12 +11,19 @@
 
 <p align="center">
   <a href="https://github.com/raghurammrsd/CODEGRAPH_MCP"><img src="https://img.shields.io/github/stars/raghurammrsd/CODEGRAPH_MCP?style=for-the-badge&logo=github&color=gold" alt="GitHub Stars" /></a>
+  <a href="LICENSE.md"><img src="https://img.shields.io/badge/License-Source--Available%20(Evaluation%20Only)-red.svg?style=for-the-badge" alt="License: Source-Available" /></a>
   <a href="https://pypi.org/project/codegraph-engine/"><img src="https://img.shields.io/badge/pypi-codegraph--engine-3776AB.svg?style=for-the-badge&logo=pypi" alt="PyPI: codegraph-engine" /></a>
   <a href="src/codegraph/mcp/server.py"><img src="https://img.shields.io/badge/MCP-97%20Verified%20Tools-2ea043.svg?style=for-the-badge" alt="MCP Tools: 97 verified" /></a>
   <a href="tests/"><img src="https://img.shields.io/badge/pytest-1074%20passed%20(100%25)-brightgreen.svg?style=for-the-badge&logo=pytest" alt="Tests: 1074 passed" /></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/ruff-0%20errors-success.svg?style=for-the-badge" alt="Ruff: 0 errors" /></a>
   <a href="src/codegraph/"><img src="https://img.shields.io/badge/mypy-strict%20(134%20files)-blue.svg?style=for-the-badge" alt="Mypy: strict" /></a>
 </p>
+
+> [!IMPORTANT]
+> **Source-Available (Inspection & Evaluation Only)**  
+> This repository is public for security auditing, architectural evaluation, and transparency.  
+> **Commercial use, production deployment, and redistribution require a commercial license.**  
+> To purchase a Team, Enterprise, or Agency License, contact **msriraghuram@gmail.com** or open an inquiry at [github.com/raghurammrsd/CODEGRAPH_MCP](https://github.com/raghurammrsd/CODEGRAPH_MCP).
 
 > CodeGraph MCP provides deterministic, evidence-backed repository intelligence through Abstract Syntax Trees, framework router hierarchies, database lineage, and runtime observation across 25 production pillars and 97 FastMCP tools.
 
@@ -1120,18 +1127,10 @@ codegraph mcp stop                                         # Stop active MCP pro
 
 ---
 
-## 15. Contributing & License
+## 15. License & Commercial Terms
 
-```bash
-git clone https://github.com/raghurammrsd/CODEGRAPH_MCP.git
-cd CODEGRAPH_MCP
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev,mcp,system]"
+This repository is **Source-Available** for evaluation, security auditing, and architectural inspection under the [CodeGraph Source-Available License](LICENSE.md).
 
-python3 -m ruff check .
-python3 -m mypy src/
-python3 -m pytest -q
-```
-
-Licensed under the [MIT License](LICENSE).
+- **Inspection & Security Auditing**: Permitted for reference, transparency, and architectural evaluation.
+- **Commercial & Production Use**: Requires an official Commercial or Team License.
+- **Contact & Inquiries**: For commercial licenses, enterprise deployments, and agency licensing, contact `msriraghuram@gmail.com`.

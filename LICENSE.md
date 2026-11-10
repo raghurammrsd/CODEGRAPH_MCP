@@ -1,0 +1,11 @@
+# CodeGraph License: Source-Available (Evaluation & Audit Only)
+
+Copyright (c) 2026 Sri Raghuram. All Rights Reserved.
+
+This source code is provided for reference, evaluation, and security audit purposes only.
+
+You may view, clone, and inspect the code for educational and security audit purposes. No license is granted to copy, distribute, modify, run in production, or use this software for commercial purposes without explicit written permission and a commercial license from the author.
+
+For commercial licensing, enterprise deployment, team inquiries, or agency use:
+- Contact: msriraghuram@gmail.com
+- Repository: https://github.com/raghurammrsd/CODEGRAPH_MCP
