@@ -29,7 +29,7 @@
 
 <p align="center">
   <a href="https://raghurammrsd.github.io/CODEGRAPH_MCP/"><strong>Documentation Site</strong></a> •
-  <a href="https://pypi.org/project/codegraph-engine/3.0.1/"><strong>PyPI Package (v3.0.1)</strong></a> •
+  <a href="https://pypi.org/project/codegraph-engine/3.0.2/"><strong>PyPI Package (v3.0.2)</strong></a> •
   <a href="#overview"><strong>Overview</strong></a> •
   <a href="#the-25-production-pillars-of-codegraph-mcp"><strong>25 Pillars</strong></a> •
   <a href="#interactive-web-dashboard--vs-code-extension"><strong>Web Dashboard & VS Code</strong></a> •
@@ -1077,7 +1077,7 @@ codegraph doctor --processes                               # Inspect active MCP 
 codegraph status .                                         # Show index freshness (sub-50ms Git fast path)
 codegraph doctor . --database --processes                  # Verify SQLite integrity, FKs, FTS, and memory
 codegraph privacy .                                        # Verify zero sensitive files indexed
-codegraph version                                          # Print CodeGraph MCP version (3.0.1)
+codegraph version                                          # Print CodeGraph MCP version (3.0.2)
 
 # Code, Graph, Routes & Context Interrogation
 codegraph search "authenticate" -r .                       # Search indexed symbols and text chunks

@@ -823,7 +823,7 @@ def _get_html_dashboard() -> str:
         <span id="live-clock">00:00:00</span>
       </div>
       <button class="btn-theme" onclick="toggleTheme()">FX</button>
-      <a class="btn-pypi" href="https://pypi.org/project/codegraph-engine/3.0.1/" target="_blank" rel="noopener">CODEGRAPH 3.0.1 ↗</a>
+      <a class="btn-pypi" href="https://pypi.org/project/codegraph-engine/3.0.2/" target="_blank" rel="noopener">CODEGRAPH 3.0.2 ↗</a>
     </div>
   </header>
 
@@ -1284,9 +1284,9 @@ def _get_html_dashboard() -> str:
 
       <!-- FOOTER CONTACT & REPOSITORIES (MATCHING USER SCREENSHOT) -->
       <div class="footer-cards">
-        <a class="footer-card" href="https://pypi.org/project/codegraph-engine/3.0.1/" target="_blank" rel="noopener">
+        <a class="footer-card" href="https://pypi.org/project/codegraph-engine/3.0.2/" target="_blank" rel="noopener">
           <div class="footer-card-label">OFFICIAL PYPI PACKAGE</div>
-          <div class="footer-card-val">codegraph-engine 3.0.1</div>
+          <div class="footer-card-val">codegraph-engine 3.0.2</div>
           <div class="footer-card-action">VIEW ON PYPI ↗</div>
         </a>
         <a class="footer-card" href="https://github.com/raghurammrsd/CODEGRAPH_MCP" target="_blank" rel="noopener">
@@ -1299,9 +1299,9 @@ def _get_html_dashboard() -> str:
           <div class="footer-card-val">97 FastMCP Tools Manual</div>
           <div class="footer-card-action">BROWSE DOCS ↗</div>
         </a>
-        <div class="footer-card" style="cursor: pointer;" onclick="navigator.clipboard.writeText('pip install codegraph-engine==3.0.1'); alert('Copied install command!');">
+        <div class="footer-card" style="cursor: pointer;" onclick="navigator.clipboard.writeText('pip install codegraph-engine==3.0.2'); alert('Copied install command!');">
           <div class="footer-card-label">ONE-CLICK INSTALL</div>
-          <div class="footer-card-val">pip install codegraph-engine==3.0.1</div>
+          <div class="footer-card-val">pip install codegraph-engine==3.0.2</div>
           <div class="footer-card-action">COPY COMMAND 📋</div>
         </div>
       </div>

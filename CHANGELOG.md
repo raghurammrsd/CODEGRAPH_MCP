@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.0.2 (BYOC PostgreSQL Engine, Opinionated Core12 Profile & Crash Hardening)
+
+### Bring Your Own Cloud (BYOC) PostgreSQL Storage Engine
+- **Universal PostgreSQL Compatibility**: Native support for any PostgreSQL-compatible cloud database (Supabase, Neon, AWS RDS, CockroachDB, Azure Cosmos DB) via `CODEGRAPH_DATABASE_URL` with automatic local SQLite fallback.
+- **Relational DDL & Performance Indexes**: 22 relational schema tables and 34 high-throughput indexes across AST symbols, call edges, framework routes, and lineage tables.
+- **Database Management CLI (`codegraph db`)**: Added `codegraph db init` (sub-second schema initialization), `codegraph db check` (latency and TLS health verification with password redaction), and `codegraph db status` (storage metrics across SQLite and PostgreSQL).
+
+### Opinionated 12-Core-Tools Profile (`--profile core12`)
+- **92% Prompt Token Reduction**: Cuts LLM system prompt token consumption from ~14,400 tokens down to ~1,150 tokens.
+- **Elimination of Router Ambiguity**: Exposes 12 high-signal, non-overlapping tools (`find_symbol`, `get_callers`, `get_callees`, `find_routes`, `read_file_range`, `get_file_outline`, `analyze_change_impact`, `find_db_models`, `get_schema_impact`, `find_tests_for_symbol`, `safe_rename_symbol`, `get_architecture_summary`) while maintaining all 97 tools under `--profile full`.
+- **One-Command AI Editor Integration (`codegraph connect`)**: Auto-detects Cursor, Claude Code, Antigravity, Cline, Windsurf, and Codex, configuring them with `--profile core12` and connecting remote team databases in one step.
+
+### Real-World Crash Fixes & AST Hardening Across 6 Ecosystems
+- **Normalized Speculative Patch Evaluation**: Fixed list-versus-dict schema mismatch in `evaluate_speculative_patch`.
+- **Lenient Positional Arguments & Guard Fallbacks**: Fixed positional argument crashes across `batch_get_context`, `fast_graph_path`, `get_distributed_trace`, `resolve_polymorphic_callees`, and `rollback_refactor`.
+- **TypeScript Generics & Constructor Calls**: Supported complex class generics (`class Hono<E, S>`) and `new TargetClass()` instantiation AST nodes.
+- **Go Lowercase Private Structs**: Recognized unexported Go struct definitions and labeled anonymous route handlers (`file:Lline(anonymous)`).
+- **Roblox Luau Top-Level Return Functions**: Parsed anonymous top-level module function returns.
+- **Safe Template Search**: Restored non-code HTML, SQL, and Markdown text discovery in hybrid search.
+- **Passive WAL Checkpointing**: Added passive checkpoints during indexing batch commits to prevent SQLite WAL bloat.
+
+### Source-Available Legal Protection
+- **Source-Available Licensing**: Adopted clear Source-Available evaluation and audit license with commercial protection for team and enterprise deployments.
+
 ## 3.0.1 (25 Pillars, 97 Verified FastMCP Tools, Multi-Language Fixes & Windows Portability)
 
 ### Actix-Web Programmatic Route & Scope Hierarchy
