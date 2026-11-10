@@ -120,373 +120,381 @@ POSTGRES_SCHEMA_STATEMENTS: tuple[str, ...] = (
     """
     CREATE TABLE IF NOT EXISTS metadata (
         key TEXT PRIMARY KEY,
-        value TEXT
+        value TEXT NOT NULL
     );
     """,
     """
     CREATE TABLE IF NOT EXISTS codegraph_meta (
         key TEXT PRIMARY KEY,
-        value TEXT
+        value TEXT NOT NULL
     );
     """,
     # 2. Files
     """
     CREATE TABLE IF NOT EXISTS files (
         path TEXT PRIMARY KEY,
-        language TEXT,
-        size BIGINT,
-        mtime DOUBLE PRECISION,
-        content_hash TEXT,
-        indexed_at DOUBLE PRECISION,
-        status TEXT,
-        error TEXT,
-        category TEXT
+        hash TEXT NOT NULL,
+        language TEXT NOT NULL,
+        indexed_at BIGINT NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'ok',
+        parse_error TEXT,
+        last_valid_hash TEXT,
+        category TEXT NOT NULL DEFAULT 'SOURCE'
     );
     """,
     # 3. Chunks
     """
     CREATE TABLE IF NOT EXISTS chunks (
-        id TEXT PRIMARY KEY,
-        path TEXT,
-        language TEXT,
-        kind TEXT,
-        name TEXT,
-        signature TEXT,
-        start_line INTEGER,
-        end_line INTEGER,
-        content TEXT,
-        content_hash TEXT,
-        docstring TEXT,
-        parent_id TEXT,
-        depth INTEGER
+        id BIGSERIAL PRIMARY KEY,
+        path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        language TEXT NOT NULL,
+        symbol TEXT,
+        symbol_type TEXT,
+        start_line INTEGER NOT NULL,
+        end_line INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        hash TEXT NOT NULL
     );
     """,
     # 4. Symbols
     """
     CREATE TABLE IF NOT EXISTS symbols (
-        id TEXT PRIMARY KEY,
-        canonical_id TEXT,
-        path TEXT,
-        language TEXT,
-        kind TEXT,
-        name TEXT,
-        qualified_name TEXT,
-        signature TEXT,
-        start_line INTEGER,
-        end_line INTEGER,
-        scope TEXT,
-        module TEXT,
-        documentation TEXT,
-        content_hash TEXT,
-        parent_id TEXT,
+        id TEXT NOT NULL DEFAULT '',
+        canonical_id TEXT NOT NULL DEFAULT '',
+        name TEXT NOT NULL,
+        qualified_name TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        start_line INTEGER NOT NULL,
+        end_line INTEGER NOT NULL,
+        decorators TEXT NOT NULL DEFAULT '',
+        language TEXT NOT NULL DEFAULT 'python',
+        module TEXT NOT NULL DEFAULT '',
+        scope TEXT NOT NULL DEFAULT '',
+        signature TEXT NOT NULL DEFAULT '',
+        content_hash TEXT NOT NULL DEFAULT '',
+        parent_symbol_id TEXT,
+        visibility TEXT NOT NULL DEFAULT 'public',
         return_type TEXT,
-        is_async INTEGER,
-        decorators TEXT,
-        visibility TEXT,
-        status TEXT
+        parameter_count INTEGER,
+        documentation TEXT
     );
     """,
     # 5. Imports
     """
     CREATE TABLE IF NOT EXISTS imports (
-        source_symbol_id TEXT,
-        imported_symbol_id TEXT,
-        imported_module TEXT,
-        imported_name TEXT,
+        source_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        module TEXT NOT NULL,
+        name TEXT,
         alias TEXT,
-        is_type_checking INTEGER,
-        path TEXT,
-        line INTEGER,
-        confidence TEXT,
-        evidence TEXT,
-        source_hash TEXT,
-        indexed_commit TEXT,
-        evidence_status TEXT
+        full_name TEXT,
+        line INTEGER NOT NULL DEFAULT 1,
+        source_module TEXT NOT NULL DEFAULT '',
+        imported_module TEXT NOT NULL DEFAULT '',
+        imported_name TEXT,
+        local_name TEXT NOT NULL DEFAULT '',
+        import_type TEXT NOT NULL DEFAULT 'module',
+        resolved_path TEXT,
+        resolved_module TEXT
     );
     """,
     # 6. Calls
     """
     CREATE TABLE IF NOT EXISTS calls (
-        caller_id TEXT,
-        callee_id TEXT,
-        callee_name TEXT,
-        line INTEGER,
-        end_line INTEGER,
-        confidence TEXT,
-        path TEXT,
-        evidence TEXT,
-        source_hash TEXT,
-        indexed_commit TEXT,
-        receiver TEXT,
+        source_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        callee TEXT NOT NULL,
         qualified_callee TEXT,
-        is_constructor INTEGER,
-        is_dynamic INTEGER,
-        evidence_status TEXT
+        line INTEGER NOT NULL DEFAULT 1,
+        confidence TEXT NOT NULL DEFAULT 'LOW',
+        source_symbol_id TEXT,
+        resolved_symbol_id TEXT
     );
     """,
     # 7. Inheritance
     """
     CREATE TABLE IF NOT EXISTS inheritance (
-        source_symbol TEXT,
-        base_name TEXT,
-        relationship TEXT,
-        source_file TEXT,
-        line INTEGER,
-        source_canonical_id TEXT
+        source_symbol TEXT NOT NULL,
+        base_name TEXT NOT NULL,
+        relationship TEXT NOT NULL,
+        source_file TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        line INTEGER NOT NULL DEFAULT 1,
+        source_canonical_id TEXT NOT NULL DEFAULT ''
     );
     """,
     # 8. Raw Framework Routes
     """
     CREATE TABLE IF NOT EXISTS raw_framework_routes (
-        id TEXT PRIMARY KEY,
-        framework TEXT,
-        http_method TEXT,
-        route_path TEXT,
-        normalized_route TEXT,
-        handler_name TEXT,
-        handler_canonical_id TEXT,
-        file_path TEXT,
-        line INTEGER,
-        end_line INTEGER,
-        confidence TEXT,
-        evidence TEXT,
-        parameters_json TEXT,
-        middleware_json TEXT,
-        response_model TEXT
+        endpoint_id TEXT PRIMARY KEY,
+        framework TEXT NOT NULL,
+        http_method TEXT NOT NULL,
+        route_path TEXT NOT NULL,
+        normalized_route TEXT NOT NULL,
+        handler_name TEXT NOT NULL,
+        handler_canonical_id TEXT NOT NULL,
+        file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        line INTEGER NOT NULL,
+        evidence TEXT NOT NULL,
+        confidence TEXT NOT NULL DEFAULT 'HIGH',
+        router_name TEXT NOT NULL DEFAULT ''
     );
     """,
     # 9. Router Mounts
     """
     CREATE TABLE IF NOT EXISTS router_mounts (
-        id TEXT PRIMARY KEY,
-        framework TEXT,
-        prefix TEXT,
-        router_expr TEXT,
-        parent_router TEXT,
-        file_path TEXT,
-        line INTEGER
+        mount_id TEXT PRIMARY KEY,
+        framework TEXT NOT NULL,
+        parent_router TEXT NOT NULL,
+        child_router TEXT NOT NULL,
+        prefix TEXT NOT NULL,
+        file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        line INTEGER NOT NULL,
+        evidence TEXT NOT NULL,
+        confidence TEXT NOT NULL DEFAULT 'HIGH'
     );
     """,
     # 10. Router Definitions
     """
     CREATE TABLE IF NOT EXISTS router_definitions (
-        id TEXT PRIMARY KEY,
-        framework TEXT,
-        router_var TEXT,
-        router_class TEXT,
-        prefix TEXT,
-        file_path TEXT,
-        line INTEGER
+        id BIGSERIAL PRIMARY KEY,
+        framework TEXT NOT NULL,
+        router_name TEXT NOT NULL,
+        prefix TEXT NOT NULL,
+        file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        line INTEGER NOT NULL,
+        evidence TEXT NOT NULL
     );
     """,
     # 11. Local Bindings
     """
     CREATE TABLE IF NOT EXISTS local_bindings (
-        id TEXT PRIMARY KEY,
-        target_name TEXT,
-        file_path TEXT,
-        line INTEGER,
-        scope TEXT,
-        expr_kind TEXT,
-        source_expr TEXT,
-        base_expr TEXT,
-        attr_name TEXT,
-        is_conditional INTEGER
+        id BIGSERIAL PRIMARY KEY,
+        target_name TEXT NOT NULL,
+        file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        line INTEGER NOT NULL,
+        "column" INTEGER,
+        scope TEXT NOT NULL DEFAULT '',
+        expr_kind TEXT NOT NULL DEFAULT 'IDENTIFIER',
+        source_expr TEXT NOT NULL DEFAULT '',
+        is_conditional INTEGER NOT NULL DEFAULT 0,
+        base_expr TEXT NOT NULL DEFAULT '',
+        attr_name TEXT NOT NULL DEFAULT '',
+        dict_entries_json TEXT NOT NULL DEFAULT '[]',
+        list_entries_json TEXT NOT NULL DEFAULT '[]',
+        subscript_target TEXT,
+        subscript_key TEXT,
+        subscript_index INTEGER
     );
     """,
     # 12. Framework Routes
     """
     CREATE TABLE IF NOT EXISTS framework_routes (
-        id TEXT PRIMARY KEY,
-        framework TEXT,
-        http_method TEXT,
-        route_path TEXT,
-        normalized_route TEXT,
-        handler_name TEXT,
-        handler_canonical_id TEXT,
-        file_path TEXT,
-        line INTEGER,
-        end_line INTEGER,
-        confidence TEXT,
-        evidence TEXT,
-        parameters_json TEXT,
-        middleware_json TEXT,
-        response_model TEXT,
-        resolution_state TEXT,
-        router_origin TEXT,
-        unmounted_prefix TEXT,
-        synthetic_origin TEXT,
-        mounted_depth INTEGER
+        endpoint_id TEXT PRIMARY KEY,
+        framework TEXT NOT NULL,
+        http_method TEXT NOT NULL,
+        route_path TEXT NOT NULL,
+        normalized_route TEXT NOT NULL,
+        handler_name TEXT NOT NULL,
+        handler_canonical_id TEXT NOT NULL,
+        file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        line INTEGER NOT NULL,
+        evidence TEXT NOT NULL,
+        confidence TEXT NOT NULL DEFAULT 'HIGH'
     );
     """,
     # 13. References
     """
     CREATE TABLE IF NOT EXISTS "references" (
-        source_symbol_id TEXT,
+        id BIGSERIAL PRIMARY KEY,
+        source_symbol_id TEXT NOT NULL,
         target_symbol_id TEXT,
-        relationship TEXT,
-        confidence TEXT,
-        path TEXT,
-        start_line INTEGER,
-        end_line INTEGER,
-        evidence TEXT,
-        source_hash TEXT,
+        relationship TEXT NOT NULL,
+        confidence TEXT NOT NULL,
+        path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        start_line INTEGER NOT NULL,
+        end_line INTEGER NOT NULL,
+        evidence TEXT NOT NULL DEFAULT '',
+        source_hash TEXT NOT NULL DEFAULT '',
         indexed_commit TEXT,
-        evidence_status TEXT
+        evidence_status TEXT NOT NULL DEFAULT 'current'
     );
     """,
     # 14. Graph Edges
     """
     CREATE TABLE IF NOT EXISTS graph_edges (
-        source TEXT,
-        target TEXT,
-        relationship TEXT,
-        confidence TEXT,
-        file_path TEXT,
-        line INTEGER,
-        weight DOUBLE PRECISION,
-        evidence_class TEXT,
-        evidence TEXT
+        source TEXT NOT NULL,
+        target TEXT NOT NULL,
+        relationship TEXT NOT NULL,
+        confidence TEXT NOT NULL,
+        file TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        start_line INTEGER NOT NULL,
+        end_line INTEGER NOT NULL,
+        evidence TEXT NOT NULL DEFAULT '',
+        evidence_id TEXT NOT NULL DEFAULT '',
+        source_hash TEXT NOT NULL DEFAULT '',
+        indexed_commit TEXT,
+        evidence_class TEXT NOT NULL DEFAULT 'AST_VERIFIED',
+        reason TEXT
     );
     """,
     # 15. Context Cache
     """
     CREATE TABLE IF NOT EXISTS context_cache (
-        task_hash TEXT PRIMARY KEY,
-        task TEXT,
-        intent TEXT,
-        query TEXT,
-        packet_json TEXT,
-        tokens INTEGER,
-        created_at DOUBLE PRECISION,
-        hits INTEGER
+        cache_key TEXT PRIMARY KEY,
+        data TEXT NOT NULL,
+        created_at BIGINT NOT NULL
     );
     """,
-    # 16. DB Entities (ORM Models)
+    # 16. DB Entities
     """
     CREATE TABLE IF NOT EXISTS db_entities (
-        id TEXT PRIMARY KEY,
-        entity_type TEXT,
-        name TEXT,
-        schema_name TEXT,
-        dialect TEXT,
-        source_file TEXT,
-        line INTEGER,
-        orm_framework TEXT,
-        documentation TEXT,
-        columns_json TEXT,
-        constraints_json TEXT,
-        metadata_json TEXT
+        id BIGSERIAL PRIMARY KEY,
+        canonical_id TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL,
+        name TEXT NOT NULL,
+        dialect TEXT NOT NULL DEFAULT 'generic',
+        schema_name TEXT NOT NULL DEFAULT '',
+        table_name TEXT NOT NULL,
+        column_name TEXT NOT NULL DEFAULT '',
+        data_type TEXT NOT NULL DEFAULT '',
+        nullable INTEGER NOT NULL DEFAULT 1,
+        default_value TEXT,
+        is_primary_key INTEGER NOT NULL DEFAULT 0,
+        is_foreign_key INTEGER NOT NULL DEFAULT 0,
+        is_unique INTEGER NOT NULL DEFAULT 0,
+        is_indexed INTEGER NOT NULL DEFAULT 0,
+        target_table TEXT,
+        target_column TEXT,
+        orm_model_id TEXT,
+        framework TEXT NOT NULL DEFAULT 'sql',
+        file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        start_line INTEGER NOT NULL DEFAULT 1,
+        end_line INTEGER NOT NULL DEFAULT 1,
+        evidence TEXT NOT NULL DEFAULT '',
+        confidence TEXT NOT NULL DEFAULT 'HIGH',
+        evidence_class TEXT NOT NULL DEFAULT 'AST_VERIFIED',
+        status TEXT NOT NULL DEFAULT 'FACT',
+        metadata_json TEXT NOT NULL DEFAULT '{}'
     );
     """,
     # 17. DB Queries
     """
     CREATE TABLE IF NOT EXISTS db_queries (
         query_id TEXT PRIMARY KEY,
-        caller_symbol_id TEXT,
-        operation TEXT,
-        relationship TEXT,
-        table_name TEXT,
-        table_canonical_id TEXT,
-        columns_json TEXT,
-        framework TEXT,
-        normalized_sql TEXT,
-        file_path TEXT,
-        start_line INTEGER,
-        end_line INTEGER,
-        evidence TEXT,
-        confidence TEXT,
-        evidence_class TEXT,
-        status TEXT
+        caller_symbol_id TEXT NOT NULL,
+        operation TEXT NOT NULL,
+        relationship TEXT NOT NULL,
+        table_name TEXT NOT NULL,
+        table_canonical_id TEXT NOT NULL,
+        columns_json TEXT NOT NULL DEFAULT '[]',
+        framework TEXT NOT NULL DEFAULT 'raw_sql',
+        normalized_sql TEXT NOT NULL DEFAULT '',
+        file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        start_line INTEGER NOT NULL DEFAULT 1,
+        end_line INTEGER NOT NULL DEFAULT 1,
+        evidence TEXT NOT NULL DEFAULT '',
+        confidence TEXT NOT NULL DEFAULT 'HIGH',
+        evidence_class TEXT NOT NULL DEFAULT 'AST_VERIFIED',
+        status TEXT NOT NULL DEFAULT 'FACT'
     );
     """,
     # 18. DB Migrations
     """
     CREATE TABLE IF NOT EXISTS db_migrations (
         migration_id TEXT PRIMARY KEY,
-        canonical_id TEXT,
-        system TEXT,
-        revision TEXT,
+        canonical_id TEXT NOT NULL,
+        system TEXT NOT NULL,
+        revision TEXT NOT NULL,
         down_revision TEXT,
-        file_path TEXT,
-        start_line INTEGER,
-        end_line INTEGER,
-        created_tables_json TEXT,
-        dropped_tables_json TEXT,
-        added_columns_json TEXT,
-        removed_columns_json TEXT,
-        renamed_columns_json TEXT,
-        indexes_json TEXT,
-        foreign_keys_json TEXT,
-        constraints_json TEXT,
-        affected_tables_json TEXT,
-        evidence TEXT,
-        confidence TEXT,
-        evidence_class TEXT
+        file_path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        start_line INTEGER NOT NULL DEFAULT 1,
+        end_line INTEGER NOT NULL DEFAULT 1,
+        created_tables_json TEXT NOT NULL DEFAULT '[]',
+        dropped_tables_json TEXT NOT NULL DEFAULT '[]',
+        added_columns_json TEXT NOT NULL DEFAULT '[]',
+        removed_columns_json TEXT NOT NULL DEFAULT '[]',
+        renamed_columns_json TEXT NOT NULL DEFAULT '[]',
+        indexes_json TEXT NOT NULL DEFAULT '[]',
+        foreign_keys_json TEXT NOT NULL DEFAULT '[]',
+        constraints_json TEXT NOT NULL DEFAULT '[]',
+        affected_tables_json TEXT NOT NULL DEFAULT '[]',
+        evidence TEXT NOT NULL DEFAULT '',
+        confidence TEXT NOT NULL DEFAULT 'HIGH',
+        evidence_class TEXT NOT NULL DEFAULT 'AST_VERIFIED'
     );
     """,
     # 19. Runtime Observations
     """
     CREATE TABLE IF NOT EXISTS runtime_observations (
-        id TEXT PRIMARY KEY,
-        event_type TEXT,
-        source_service TEXT,
-        target_service TEXT,
-        source_symbol TEXT,
-        target_symbol TEXT,
-        route_path TEXT,
-        http_method TEXT,
-        trace_id TEXT,
-        span_id TEXT,
-        parent_span_id TEXT,
-        latency_ms DOUBLE PRECISION,
+        event_id TEXT PRIMARY KEY,
+        trace_id TEXT NOT NULL,
+        span_id TEXT NOT NULL,
+        parent_span_id TEXT NOT NULL DEFAULT '',
+        timestamp TEXT NOT NULL DEFAULT '',
+        source_format TEXT NOT NULL DEFAULT 'json',
+        http_method TEXT NOT NULL DEFAULT '',
+        route_path TEXT NOT NULL DEFAULT '',
+        handler_symbol TEXT NOT NULL DEFAULT '',
+        caller_symbol TEXT NOT NULL DEFAULT '',
+        callee_symbol TEXT NOT NULL DEFAULT '',
+        service_name TEXT NOT NULL DEFAULT '',
+        db_operation TEXT NOT NULL DEFAULT '',
+        db_table TEXT NOT NULL DEFAULT '',
+        db_columns_json TEXT NOT NULL DEFAULT '[]',
+        normalized_sql TEXT NOT NULL DEFAULT '',
         status_code INTEGER,
-        error_message TEXT,
-        timestamp DOUBLE PRECISION,
-        generation INTEGER,
-        evidence_class TEXT
+        exception_type TEXT NOT NULL DEFAULT '',
+        duration_ms DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+        evidence_class TEXT NOT NULL DEFAULT 'RUNTIME_OBSERVED',
+        runtime_generation INTEGER NOT NULL DEFAULT 1
     );
     """,
     # 20. Runtime Edges
     """
     CREATE TABLE IF NOT EXISTS runtime_edges (
-        source TEXT,
-        target TEXT,
-        relationship TEXT,
-        observation_count INTEGER,
-        avg_latency_ms DOUBLE PRECISION,
-        error_rate DOUBLE PRECISION,
-        first_seen DOUBLE PRECISION,
-        last_seen DOUBLE PRECISION,
-        evidence_class TEXT,
-        PRIMARY KEY (source, target, relationship)
+        edge_id TEXT PRIMARY KEY,
+        source TEXT NOT NULL,
+        target TEXT NOT NULL,
+        relationship TEXT NOT NULL,
+        operation TEXT NOT NULL DEFAULT '',
+        evidence_class TEXT NOT NULL DEFAULT 'RUNTIME_OBSERVED',
+        observation_count INTEGER NOT NULL DEFAULT 1,
+        first_seen TEXT NOT NULL DEFAULT '',
+        last_seen TEXT NOT NULL DEFAULT '',
+        avg_duration_ms DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+        max_duration_ms DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+        sample_trace_id TEXT NOT NULL DEFAULT '',
+        sample_span_id TEXT NOT NULL DEFAULT '',
+        normalized_sql TEXT NOT NULL DEFAULT '',
+        status_code INTEGER,
+        exception_type TEXT NOT NULL DEFAULT '',
+        runtime_generation INTEGER NOT NULL DEFAULT 1
     );
     """,
-    # 21. Agent Trajectory & Debugging Memories
+    # 21. Agent Memories
     """
     CREATE TABLE IF NOT EXISTS agent_memories (
-        id TEXT PRIMARY KEY,
-        category TEXT,
-        title TEXT,
-        resolution TEXT,
-        symptoms TEXT,
-        root_cause TEXT,
-        created_at DOUBLE PRECISION,
-        tags_json TEXT
+        id BIGSERIAL PRIMARY KEY,
+        key TEXT NOT NULL,
+        value TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'general',
+        created_at DOUBLE PRECISION NOT NULL DEFAULT 0.0,
+        updated_at DOUBLE PRECISION NOT NULL DEFAULT 0.0
     );
     """,
-    # 22. Indexes for High-Speed Lookups
-    "CREATE INDEX IF NOT EXISTS idx_symbols_canonical ON symbols(canonical_id);",
-    "CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);",
-    "CREATE INDEX IF NOT EXISTS idx_symbols_path ON symbols(path);",
-    "CREATE INDEX IF NOT EXISTS idx_calls_caller ON calls(caller_id);",
-    "CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls(callee_id);",
-    "CREATE INDEX IF NOT EXISTS idx_edges_source ON graph_edges(source);",
-    "CREATE INDEX IF NOT EXISTS idx_edges_target ON graph_edges(target);",
-    "CREATE INDEX IF NOT EXISTS idx_routes_norm ON framework_routes(normalized_route, http_method);",
-    "CREATE INDEX IF NOT EXISTS idx_files_status ON files(status);",
-    "CREATE INDEX IF NOT EXISTS idx_refs_source ON \"references\"(source_symbol_id);",
-    "CREATE INDEX IF NOT EXISTS idx_refs_target ON \"references\"(target_symbol_id);",
+    # 22. Indexes for fast queries
+    """
+    CREATE INDEX IF NOT EXISTS idx_symbols_canonical ON symbols (canonical_id);
+    CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols (name);
+    CREATE INDEX IF NOT EXISTS idx_symbols_qualified ON symbols (qualified_name);
+    CREATE INDEX IF NOT EXISTS idx_symbols_path ON symbols (path);
+    CREATE INDEX IF NOT EXISTS idx_routes_file ON framework_routes (file_path);
+    CREATE INDEX IF NOT EXISTS idx_routes_handler ON framework_routes (handler_canonical_id);
+    CREATE INDEX IF NOT EXISTS idx_edges_source ON graph_edges (source);
+    CREATE INDEX IF NOT EXISTS idx_edges_target ON graph_edges (target);
+    CREATE INDEX IF NOT EXISTS idx_edges_rel ON graph_edges (relationship);
+    CREATE INDEX IF NOT EXISTS idx_calls_source ON calls (source_path);
+    CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls (callee);
+    """,
 )
 
 
@@ -707,3 +715,74 @@ def get_configured_database_url() -> str | None:
     if url and (url.startswith("postgresql://") or url.startswith("postgres://")):
         return url.strip()
     return None
+
+def push_index_to_postgres(repo_path: Any, db_url: str | None = None) -> dict[str, Any]:
+    """Push local SQLite index rows into remote PostgreSQL database."""
+    import sqlite3
+    from pathlib import Path
+    try:
+        import psycopg
+    except ImportError:
+        return {"status": "error", "error": "psycopg driver not installed. Run: pip install 'psycopg[binary]'"}
+
+    target_url = db_url or get_configured_database_url()
+    if not target_url:
+        return {"status": "error", "error": "No PostgreSQL database URL provided or found in CODEGRAPH_DATABASE_URL"}
+
+    target_dir = Path(repo_path)
+    sqlite_db = target_dir / ".codegraph.sqlite3"
+    if not sqlite_db.exists():
+        return {"status": "error", "error": f"No SQLite index found at {sqlite_db}. Run 'codegraph index' first."}
+
+    # Ensure PostgreSQL schema is initialized
+    init_res = init_postgres_database(target_url)
+    if init_res.get("status") != "ok":
+        return init_res
+
+    tables_order = [
+        "metadata", "codegraph_meta", "files", "chunks", "symbols",
+        "imports", "calls", "inheritance", "raw_framework_routes",
+        "router_mounts", "router_definitions", "local_bindings",
+        "framework_routes", "references", "graph_edges", "context_cache",
+        "db_entities", "db_queries", "db_migrations"
+    ]
+
+    t0 = time.perf_counter()
+    con_sq = sqlite3.connect(sqlite_db)
+    con_pg = psycopg.connect(target_url)
+    cur_sq = con_sq.cursor()
+
+    existing_tables = set(r[0] for r in cur_sq.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall())
+
+    transferred: dict[str, int] = {}
+    try:
+        with con_pg.cursor() as cur_pg:
+            for t in tables_order:
+                if t not in existing_tables:
+                    continue
+                cols = [r[1] for r in cur_sq.execute(f'PRAGMA table_info("{t}")').fetchall()]
+                if not cols:
+                    continue
+                quoted_cols = [f'"{c}"' if c == 'column' else c for c in cols]
+                col_str = ', '.join(quoted_cols)
+                placeholders = ', '.join(['%s'] * len(cols))
+                rows = cur_sq.execute(f'SELECT {col_str} FROM "{t}"').fetchall()
+                if rows:
+                    cur_pg.executemany(f'INSERT INTO "{t}" ({col_str}) VALUES ({placeholders}) ON CONFLICT DO NOTHING', rows)
+                    transferred[t] = len(rows)
+                else:
+                    transferred[t] = 0
+            con_pg.commit()
+    finally:
+        con_pg.close()
+        con_sq.close()
+
+    elapsed_ms = round((time.perf_counter() - t0) * 1000.0, 2)
+    return {
+        "status": "ok",
+        "transferred": transferred,
+        "total_rows": sum(transferred.values()),
+        "duration_ms": elapsed_ms,
+        "url": redact_db_url(target_url),
+    }
+

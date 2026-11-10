@@ -3283,6 +3283,36 @@ def db_status_cmd(
         cli_echo(f"    • Web Routes:    {route_cnt:,}")
 
 
+@db_app.command("push")
+def db_push_cmd(
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    url: Annotated[str | None, typer.Option("--url", help="PostgreSQL connection string (or use CODEGRAPH_DATABASE_URL)")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Push local SQLite repository index into remote PostgreSQL database."""
+    from codegraph.indexing.storage import get_configured_database_url, push_index_to_postgres
+
+    repo = _resolve_repo(path, repository)
+    target_url = url or get_configured_database_url()
+    if not target_url:
+        cli_echo("Error: Remote database URL required via --url or CODEGRAPH_DATABASE_URL environment variable.", err=True)
+        raise typer.Exit(code=1)
+
+    result = push_index_to_postgres(repo, target_url)
+    if json_output:
+        cli_echo(json.dumps(result, indent=2), json_mode=True)
+    else:
+        if result.get("status") == "ok":
+            cli_echo("Successfully pushed local index to PostgreSQL!")
+            cli_echo(f"  Target:     {result.get('url')}")
+            cli_echo(f"  Total Rows: {result.get('total_rows', 0):,}")
+            cli_echo(f"  Duration:   {result.get('duration_ms')} ms")
+        else:
+            cli_echo(f"Failed to push index: {result.get('error')}", err=True)
+            raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()
 
