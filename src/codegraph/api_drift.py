@@ -288,11 +288,16 @@ def detect_api_contract_drift(
 
         client_file = str(r["file_path"] or "")
         client_line = int(r["line"] or 1)
-        raw_m = str(r["base_expr"] or "").upper()
-        if raw_m in ("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"):
-            client_method = raw_m
-        else:
-            client_method = "GET"
+        raw_candidates = [
+            str(r["source_expr"] or "").upper(),
+            str(r["attr_name"] or "").upper(),
+            str(r["base_expr"] or "").upper(),
+        ]
+        client_method = "GET"
+        for candidate in raw_candidates:
+            if candidate in ("GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"):
+                client_method = candidate
+                break
 
         resp_type = str(r["attr_name"] or "").strip()
         client_norm = normalize_route(client_method, client_path)

@@ -321,17 +321,23 @@ def get_architecture(
         lang_counts[r["language"]] = r["n"]
 
     total_symbols = con.execute("SELECT count(*) FROM symbols").fetchone()[0]
-    total_files = len(files)
+    real_total_files = con.execute("SELECT count(*) FROM files WHERE status='ok'").fetchone()[0]
+    total_files = int(real_total_files)
+    files_truncated = total_files > len(files)
 
     return {
         "source": "deterministic — parser-extracted from repository index",
         "repository": str(repository),
         "summary": {
             "total_files": total_files,
+            "sampled_files": len(files),
+            "files_truncated": files_truncated,
             "total_symbols": total_symbols,
             "total_endpoints": len(endpoints),
             "languages": lang_counts,
         },
+        "total_files": total_files,
+        "files_truncated": files_truncated,
         "languages": lang_counts,
         "frameworks": frameworks,
         "workspace": workspace_info.as_dict(),

@@ -40,9 +40,10 @@ class SemanticChangelogReport:
     schema_mutations_count: int
     markdown_changelog: str
     entries: list[SemanticChangeEntry] = field(default_factory=list)
+    warning: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "base_ref": self.base_ref,
             "head_ref": self.head_ref,
             "total_changes": self.total_changes,
@@ -52,6 +53,9 @@ class SemanticChangelogReport:
             "markdown_changelog": self.markdown_changelog,
             "entries": [e.as_dict() for e in self.entries],
         }
+        if self.warning:
+            data["warning"] = self.warning
+        return data
 
 
 def generate_semantic_changelog(
@@ -62,6 +66,7 @@ def generate_semantic_changelog(
     """Synthesize a semantic release changelog from git diffs and AST symbols."""
     repo = repository.resolve()
     diff_text = ""
+    shallow_warning: str | None = None
     try:
         proc = subprocess.run(
             ["git", "diff", f"{base_ref}..{head_ref}"],
@@ -73,6 +78,10 @@ def generate_semantic_changelog(
         )
         if proc.returncode == 0:
             diff_text = proc.stdout
+        else:
+            from codegraph.git import is_shallow_repository
+            if is_shallow_repository(repo):
+                shallow_warning = "Repository is a shallow clone (e.g. cloned with --depth 1); Git history is insufficient. Run 'git fetch --unshallow' to enable changelog generation."
     except Exception:
         diff_text = ""
 
@@ -167,4 +176,5 @@ def generate_semantic_changelog(
         schema_mutations_count=len(schemas),
         markdown_changelog="\n".join(md_lines),
         entries=entries,
+        warning=shallow_warning,
     )

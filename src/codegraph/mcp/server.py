@@ -481,6 +481,10 @@ def create_server(
     ) -> list[dict[str, str]]:
         """Return files changed between two commits or refs (read-only, sandboxed)."""
         diffs = changed_files(indexer.repository, since=since, until=until)
+        if not diffs:
+            from codegraph.git import is_shallow_repository
+            if is_shallow_repository(indexer.repository):
+                return [{"warning": "Repository is a shallow clone (e.g. cloned with --depth 1); Git history is insufficient. Run 'git fetch --unshallow' to enable revision diffs.", "is_shallow": "true"}]
         return [d.as_dict() for d in diffs]
 
     def get_file_history(
@@ -1627,10 +1631,26 @@ def create_server(
         target_fn: Any = all_tools[tool_name]
 
         def _make_guarded(fn: Any) -> Any:
+            import inspect
+            sig = inspect.signature(fn)
+            has_var_kw = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+            param_names = set(sig.parameters.keys())
+
             @functools.wraps(fn)
             def _guarded(*args: Any, **kwargs: Any) -> Any:
                 _ensure_hot_reloaded()
                 with indexer.governor.task_scope(TaskPriority.INTERACTIVE_HIGH):
+                    if not has_var_kw:
+                        clean_kwargs = dict(kwargs)
+                        if "file_path" in param_names and "file_path" not in clean_kwargs:
+                            if "file" in clean_kwargs:
+                                clean_kwargs["file_path"] = clean_kwargs.pop("file")
+                            elif "path" in clean_kwargs:
+                                clean_kwargs["file_path"] = clean_kwargs.pop("path")
+                            elif "symbol" in clean_kwargs:
+                                clean_kwargs["file_path"] = clean_kwargs.pop("symbol")
+                        filtered = {k: v for k, v in clean_kwargs.items() if k in param_names}
+                        return fn(*args, **filtered)
                     return fn(*args, **kwargs)
 
             return _guarded

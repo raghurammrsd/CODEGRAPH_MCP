@@ -121,9 +121,10 @@ class StructuralDiffReport:
     db_impact: list[dict[str, Any]] = field(default_factory=list)
     total_file_changes: int = 0
     total_symbol_changes: int = 0
+    warning: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "base_ref": self.base_ref,
             "head_ref": self.head_ref,
             "added_files": self.added_files,
@@ -140,6 +141,9 @@ class StructuralDiffReport:
             "total_file_changes": self.total_file_changes,
             "total_symbol_changes": self.total_symbol_changes,
         }
+        if self.warning:
+            data["warning"] = self.warning
+        return data
 
 
 def _run_git(repository: Path, *args: str, timeout: int = 15) -> str | None:
@@ -219,7 +223,11 @@ def compare_revisions(
         raw_diff = _run_git(repository, "diff", "-M", "--name-status", base, head)
 
     if raw_diff is None:
-        return StructuralDiffReport(base_ref=base, head_ref=head)
+        from codegraph.git import is_shallow_repository
+        warn = None
+        if is_shallow_repository(repository):
+            warn = "Repository is a shallow clone (e.g. cloned with --depth 1); Git history is insufficient. Run 'git fetch --unshallow' to enable revision comparisons."
+        return StructuralDiffReport(base_ref=base, head_ref=head, warning=warn)
 
     added_files: list[str] = []
     deleted_files: list[str] = []

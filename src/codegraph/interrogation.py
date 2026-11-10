@@ -2251,6 +2251,8 @@ def get_architecture(
         "status": "ok",
         **meta,
         "repository": str(repository.resolve()),
+        "total_files": arch.get("total_files"),
+        "files_truncated": arch.get("files_truncated", False),
         "languages": arch.get("languages", ["Python"]),
         "directories": arch.get("directories", []),
         "modules": arch.get("top_level_modules", []),
@@ -2278,6 +2280,20 @@ def get_git_impact(
 
     meta = get_index_metadata(con, repository)
     diffs = changed_files(repository, since=base, until=head)
+    if not diffs:
+        from codegraph.git import is_shallow_repository
+        if is_shallow_repository(repository):
+            return {
+                "status": "warning",
+                "warning": "Repository is a shallow clone (e.g. cloned with --depth 1); Git history is insufficient. Run 'git fetch --unshallow' to enable full change impact analysis.",
+                "is_shallow": True,
+                "changed_files": 0,
+                "affected_symbols": [],
+                "affected_callers": [],
+                "affected_callees": [],
+                "affected_routes": [],
+                "affected_tests": [],
+            }
     changed_paths = [d.path for d in diffs]
 
     changed_symbols: list[str] = []

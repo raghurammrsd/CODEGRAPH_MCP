@@ -80,9 +80,10 @@ class DeepImpactReport:
     risk_level: str = "LOW"  # "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
     breaking_change_flags: list[str] = field(default_factory=list)
     recommended_test_command: str = ""
+    warning: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "base_ref": self.base_ref,
             "head_ref": self.head_ref,
             "target_symbol": self.target_symbol,
@@ -103,6 +104,9 @@ class DeepImpactReport:
             "breaking_change_flags": self.breaking_change_flags,
             "recommended_test_command": self.recommended_test_command,
         }
+        if self.warning:
+            data["warning"] = self.warning
+        return data
 
 
 def _is_frontend_file(path: str) -> bool:
@@ -188,7 +192,7 @@ def get_deep_change_impact(
         changed_files = diff_report.modified_files + diff_report.added_files + diff_report.deleted_files
 
         if not changed_symbols_list and not changed_files:
-            return DeepImpactReport(base_ref=base, head_ref=head)
+            return DeepImpactReport(base_ref=base, head_ref=head, warning=diff_report.warning)
 
     direct_callers: list[ImpactedEntity] = []
     transitive_callers: list[ImpactedEntity] = []

@@ -57,6 +57,12 @@ def is_git_repository(repository: Path) -> bool:
     return _git(repository, "rev-parse", "--git-dir") is not None
 
 
+def is_shallow_repository(repository: Path) -> bool:
+    """Return True if the repository is a shallow clone (e.g. cloned with --depth 1)."""
+    raw = _git(repository, "rev-parse", "--is-shallow-repository")
+    return raw is not None and raw.strip().lower() == "true"
+
+
 def current_commit(repository: Path) -> str | None:
     """Return the current HEAD commit SHA, or None if not a git repository."""
     raw = _git(repository, "rev-parse", "HEAD")
@@ -248,6 +254,18 @@ def analyze_change_impact(
 ) -> dict[str, object]:
     """Analyze downstream callers, routes, providers, and tests affected by changes between since and until."""
     diffs = changed_files(repository, since=since, until=until)
+    if not diffs and is_shallow_repository(repository):
+        return {
+            "status": "warning",
+            "warning": "Repository is a shallow clone (e.g. cloned with --depth 1); Git history is insufficient. Run 'git fetch --unshallow' to enable full change impact analysis.",
+            "is_shallow": True,
+            "changed_files": 0,
+            "affected_callers": [],
+            "affected_tests": [],
+            "affected_routes": [],
+            "affected_providers": [],
+            "impact_items": [],
+        }
     changed_paths = [d.path for d in diffs]
     changed_symbols: list[str] = []
     removed_symbols: list[str] = []

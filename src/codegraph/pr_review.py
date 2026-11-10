@@ -62,9 +62,10 @@ class PRReviewReport:
     affected_tests: list[str] = field(default_factory=list)
     suggested_test_command: str = ""
     markdown_report: str = ""
+    warning: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "base_ref": self.base_ref,
             "head_ref": self.head_ref,
             "verdict": self.verdict,
@@ -79,6 +80,9 @@ class PRReviewReport:
             "suggested_test_command": self.suggested_test_command,
             "markdown_report": self.markdown_report,
         }
+        if self.warning:
+            data["warning"] = self.warning
+        return data
 
 
 def generate_pr_review(
@@ -218,6 +222,7 @@ def generate_pr_review(
         affected_tests=sorted(covered_test_paths),
         suggested_test_command=suggested_test_cmd,
         markdown_report=markdown,
+        warning=diff_report.warning,
     )
 
 

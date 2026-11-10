@@ -844,9 +844,9 @@ def _extract_orm_class(
         elif "db.Model" in base_names:
             framework = "flask_sqlalchemy"
     if not framework:
-        if "SQLModel" in base_names or is_sqlmodel_table:
+        if is_sqlmodel_table or "SQLModel" in base_names:
             framework = "sqlmodel"
-        elif any(b in ("Base", "DeclarativeBase", "AsyncAttrs") or b.endswith("Base") for b in base_names):
+        elif any(b in ("Base", "DeclarativeBase", "AsyncAttrs") for b in base_names):
             framework = "sqlalchemy"
 
     # Also detect if class explicitly defines `__tablename__`
@@ -884,6 +884,18 @@ def _extract_orm_class(
 
     if explicit_tablename and not framework:
         framework = "sqlalchemy"
+
+    # Strict ORM Guard: Pydantic schemas without __tablename__ or table=True are NOT database tables
+    is_pydantic = any(
+        b in ("BaseModel", "pydantic.BaseModel", "GenericModel") or b.endswith("BaseModel")
+        for b in base_names
+    )
+    if is_pydantic and not explicit_tablename and not is_sqlmodel_table:
+        return
+
+    # A class without __tablename__, without table=True, and without Django Model is not an SQL table
+    if not explicit_tablename and not django_meta_table and not is_sqlmodel_table and framework != "django_orm":
+        return
 
     if not framework:
         return
