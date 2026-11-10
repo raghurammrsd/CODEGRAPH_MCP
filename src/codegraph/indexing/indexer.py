@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 import threading
 import time
@@ -768,10 +769,9 @@ class Indexer:
                         for r in con.execute("SELECT path, hash, status FROM files").fetchall()
                     }
 
-                    for idx, item in enumerate(files):
-                        if idx > 0 and idx % batch_limit == 0:
-                            self.governor.yield_if_needed(TaskPriority.BACKGROUND)
-
+                    # Identify changed/new files needing parsing
+                    pending_files: list[tuple[Any, str, str, str, str, bool]] = []
+                    for item in files:
                         relative = item.relative_path.as_posix()
                         t_read = time.perf_counter()
                         try:
@@ -805,7 +805,35 @@ class Indexer:
                             files_processed=1,
                             items_processed=1,
                         )
+                        pending_files.append((item, relative, content, digest, cat_str, old_state is not None))
 
+                    # Parallel AST Parsing across available CPU threads
+                    parse_results: dict[str, Any] = {}
+                    if pending_files:
+                        from concurrent.futures import ThreadPoolExecutor
+                        num_workers = min(8, max(2, os.cpu_count() or 4))
+
+                        def _parse_task(task_entry: tuple[Any, str, str, str, str, bool]) -> tuple[str, Any]:
+                            _, p_rel, p_content, p_digest, _, _ = task_entry
+                            p_cache = get_parse_cache()
+                            p_lang = task_entry[0].language
+                            p_cached = p_cache.get((p_digest, PARSER_VERSION, p_lang))
+                            if p_cached is not None:
+                                return p_rel, p_cached
+                            res = parse(p_content, p_lang, p_rel)
+                            p_cache.put((p_digest, PARSER_VERSION, p_lang), res)
+                            return p_rel, res
+
+                        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                            for p_rel, res in executor.map(_parse_task, pending_files):
+                                parse_results[p_rel] = res
+
+                    # Sequential database writes with batch commits
+                    for idx, (item, relative, content, digest, cat_str, is_existing) in enumerate(pending_files):
+                        if idx > 0 and idx % batch_limit == 0:
+                            self.governor.yield_if_needed(TaskPriority.BACKGROUND)
+
+                        pre_res = parse_results.get(relative)
                         success = self._replace_file(
                             con,
                             relative,
@@ -813,8 +841,9 @@ class Indexer:
                             content,
                             digest,
                             category=cat_str,
-                            is_existing=(old_state is not None),
+                            is_existing=is_existing,
                             telemetry=telemetry,
+                            precomputed_result=pre_res,
                         )
                         if success:
                             indexed += 1
@@ -838,17 +867,6 @@ class Indexer:
                             con.commit()
                             telemetry.batch_commits += 1
                             telemetry.observe_wal(self.db_path)
-                            try:
-                                con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                                telemetry.wal_checkpoints += 1
-                            except sqlite3.OperationalError:
-                                pass
-                            telemetry.observe_wal(self.db_path)
-                            telemetry.record(
-                                "sqlite_writes",
-                                time.perf_counter() - t_commit,
-                                db_writes=1,
-                            )
                             uncommitted_in_batch = 0
                             if progress_callback is not None:
                                 progress_callback("ast_parsing", idx + 1, total_files, telemetry)
@@ -1266,18 +1284,22 @@ class Indexer:
         *,
         is_existing: bool = True,
         telemetry: IndexingTelemetry | None = None,
+        precomputed_result: Any | None = None,
     ) -> bool:
         """Parse and insert a file. If parse fails, preserves last-known-good state."""
         from codegraph.security.redaction import redact_secrets
 
         t_parse = time.perf_counter()
-        parse_cache = get_parse_cache()
-        cached = parse_cache.get((digest, PARSER_VERSION, language))
-        if cached is not None:
-            result = cached
+        if precomputed_result is not None:
+            result = precomputed_result
         else:
-            result = parse(content, language, path)
-            parse_cache.put((digest, PARSER_VERSION, language), result)
+            parse_cache = get_parse_cache()
+            cached = parse_cache.get((digest, PARSER_VERSION, language))
+            if cached is not None:
+                result = cached
+            else:
+                result = parse(content, language, path)
+                parse_cache.put((digest, PARSER_VERSION, language), result)
         parse_elapsed = time.perf_counter() - t_parse
 
         if telemetry is not None:
