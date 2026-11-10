@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import sqlite3
 import threading
@@ -50,6 +51,8 @@ from .parser import PARSER_VERSION, parse
 from .pool import SQLiteConnectionPool
 from .scanner import LANGUAGES, scan
 from .telemetry import IndexingTelemetry, get_process_rss_mb
+
+logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 8
 
@@ -492,6 +495,7 @@ class Indexer:
         self.max_wildcard_expansions = max_wildcard_expansions
         self.last_epistemic_findings: list[dict[str, object]] = []
         self.last_telemetry: IndexingTelemetry | None = None
+        self.database_url: str | None = getattr(self.settings, "database_url", None) or os.getenv("CODEGRAPH_DATABASE_URL")
         self._pool: SQLiteConnectionPool | None = None
         self._schema_lock = threading.Lock()
         self._schema_verified = False
@@ -525,8 +529,29 @@ class Indexer:
         return con
 
     @contextmanager
-    def session(self) -> Iterator[sqlite3.Connection]:
+    def session(self) -> Iterator[Any]:
         """Borrow a pooled connection; commit on success, rollback on failure, return to pool."""
+        db_url = self.database_url or os.getenv("CODEGRAPH_DATABASE_URL")
+        if db_url and (db_url.startswith("postgresql://") or db_url.startswith("postgres://")):
+            try:
+                import psycopg
+
+                from codegraph.indexing.storage import PostgresConnectionWrapper, redact_db_url
+
+                raw_conn = psycopg.connect(db_url, connect_timeout=5)
+                wrapped = PostgresConnectionWrapper(raw_conn, redact_db_url(db_url))
+                try:
+                    yield wrapped
+                    wrapped.commit()
+                except BaseException:
+                    wrapped.rollback()
+                    raise
+                finally:
+                    wrapped.close()
+                return
+            except Exception as exc:
+                logger.warning("Remote PostgreSQL unavailable (%s), falling back to local SQLite", exc)
+
         con, is_owner = self.pool.acquire()
         try:
             yield con

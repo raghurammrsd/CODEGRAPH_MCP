@@ -3093,6 +3093,114 @@ def roblox_routes_cli_cmd(
                 cli_echo(f"  • {p.get('symbol')} ({p.get('relationship')}) -> {p.get('store')} [{p.get('evidence_class')}]")
 
 
+@db_app.command("init")
+def db_init_cmd(
+    url: Annotated[str | None, typer.Option("--url", "-u", help="PostgreSQL connection string (or set CODEGRAPH_DATABASE_URL)")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Initialize all 22 CodeGraph AST tables and indexes in a remote PostgreSQL database."""
+    from codegraph.indexing.storage import get_configured_database_url, init_postgres_database
+
+    target_url = url or get_configured_database_url()
+    if not target_url:
+        cli_echo("Error: No database URL provided. Pass --url or set CODEGRAPH_DATABASE_URL environment variable.", err=True)
+        raise typer.Exit(code=1)
+
+    result = init_postgres_database(target_url)
+    if json_output:
+        cli_echo(json.dumps(result, indent=2), json_mode=True)
+    else:
+        if result.get("status") == "ok":
+            cli_echo("Successfully connected to PostgreSQL!")
+            cli_echo(f"  Target:          {result.get('url')}")
+            cli_echo(f"  Tables Created:  {result.get('tables_created')} / 22")
+            cli_echo(f"  Indexes Created: {result.get('indexes_created')} / 11")
+            cli_echo(f"  Duration:        {result.get('duration_ms')} ms")
+            cli_echo("\nTeam graph initialized successfully. Add CODEGRAPH_DATABASE_URL to your CI/CD secrets.")
+        else:
+            cli_echo(f"Failed initializing PostgreSQL: {result.get('error')}", err=True)
+            raise typer.Exit(code=1)
+
+
+@db_app.command("check")
+def db_check_cmd(
+    url: Annotated[str | None, typer.Option("--url", "-u", help="PostgreSQL connection string (or set CODEGRAPH_DATABASE_URL)")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Test connectivity, SSL negotiation, and ping latency to a PostgreSQL instance."""
+    from codegraph.indexing.storage import get_configured_database_url, verify_postgres_connection
+
+    target_url = url or get_configured_database_url()
+    if not target_url:
+        cli_echo("Error: No database URL provided. Pass --url or set CODEGRAPH_DATABASE_URL environment variable.", err=True)
+        raise typer.Exit(code=1)
+
+    result = verify_postgres_connection(target_url)
+    if json_output:
+        cli_echo(json.dumps(result, indent=2), json_mode=True)
+    else:
+        if result.get("connected"):
+            cli_echo("Connection test passed to PostgreSQL!")
+            cli_echo(f"  Target:   {result.get('url')}")
+            cli_echo(f"  Latency:  {result.get('latency_ms')} ms")
+            cli_echo(f"  Server:   {result.get('version')}")
+        else:
+            cli_echo(f"Connection test failed: {result.get('error')}", err=True)
+            raise typer.Exit(code=1)
+
+
+@db_app.command("status")
+def db_status_cmd(
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Inspect active storage target (local SQLite vs remote PostgreSQL) and row counts."""
+    from codegraph.indexing.storage import get_configured_database_url, redact_db_url
+
+    repo = _resolve_repo(path, repository)
+    configured_url = get_configured_database_url()
+
+    indexer = _indexer(repo)
+    with indexer.session() as con:
+        try:
+            sym_cnt = con.execute("SELECT count(*) FROM symbols").fetchone()[0]
+            edge_cnt = con.execute("SELECT count(*) FROM graph_edges").fetchone()[0]
+            route_cnt = con.execute("SELECT count(*) FROM framework_routes").fetchone()[0]
+            file_cnt = con.execute("SELECT count(*) FROM files").fetchone()[0]
+        except Exception:
+            sym_cnt, edge_cnt, route_cnt, file_cnt = 0, 0, 0, 0
+
+    status_data = {
+        "repository": repo.name,
+        "backend": "postgresql" if configured_url else "sqlite",
+        "configured_url": redact_db_url(configured_url) if configured_url else None,
+        "sqlite_path": str(indexer.db_path) if not configured_url else None,
+        "row_counts": {
+            "symbols": sym_cnt,
+            "graph_edges": edge_cnt,
+            "routes": route_cnt,
+            "files": file_cnt,
+        },
+    }
+
+    if json_output:
+        cli_echo(json.dumps(status_data, indent=2), json_mode=True)
+    else:
+        backend_name = "PostgreSQL (BYOC Remote Team Graph)" if configured_url else "SQLite (Local Embedded)"
+        cli_echo(f"CodeGraph Database Status for {repo.name}:")
+        cli_echo(f"  Backend:       {backend_name}")
+        if configured_url:
+            cli_echo(f"  Database URL:  {redact_db_url(configured_url)}")
+        else:
+            cli_echo(f"  Local SQLite:  {indexer.db_path}")
+        cli_echo("  Data Metrics:")
+        cli_echo(f"    • Files Indexed: {file_cnt:,}")
+        cli_echo(f"    • Symbols:       {sym_cnt:,}")
+        cli_echo(f"    • Graph Edges:   {edge_cnt:,}")
+        cli_echo(f"    • Web Routes:    {route_cnt:,}")
+
+
 if __name__ == "__main__":
     app()
 
