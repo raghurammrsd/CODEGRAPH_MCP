@@ -5,14 +5,14 @@ Target environment: `gemini`. CodeGraph MCP (`codegraph mcp serve`) provides det
 ## CodeGraph Mental Model
 
 - **Division of Labor**: The AI coding agent reasons, plans, and edits source code; CodeGraph interrogates the repository for AST-, framework-, and dataflow-verified facts.
-- **Core Strength**: CodeGraph is preferred for relationship-heavy and multi-file repository questions (callers/callees, HTTP routes and router mounts, dependency injection, registries/dispatch, events/tasks/commands, test coverage, monorepo package boundaries, and change impact).
+- **Core Strength**: Preferred for relationship-heavy repository questions (callers/callees, HTTP routes, DI, registries, events, test coverage, monorepo boundaries, and change impact).
 
 ## Always-On Principles
 
-1. **When to Use CodeGraph**: Use CodeGraph when repository relationships, multi-file reasoning, or literal text discovery make it materially useful—specifically for callers/callees, route-to-handler chains, dependency injection (`Depends`, providers, containers), task/command/event decorators, test coverage discovery, monorepo package boundaries, change-impact analysis, and literal text/template search (`search_code`).
+1. **Mandatory MCP Navigation (Anti-Grep Policy)**: NEVER run `grep`, `rg`, or `find` to trace callers, callees, definitions, routes, or references. CodeGraph MCP provides deterministic AST-verified tools (`find_symbol`, `find_callers`, `find_routes`, etc.) that are 100x faster, noise-free, and token-efficient. Retain CodeGraph tool priority across long chat sessions.
 2. **When Direct File Reading Is Sufficient (`LOCAL_EDIT`)**: Bypass CodeGraph graph queries for trivial single-file edits (typos, formatting, docstrings, or local variable changes inside an already-identified function). Use `get_file(path, start_line, end_line)` or `read_file` directly.
 3. **Smallest-Sufficient-Tool Principle (`find_*`, `get_*`, `trace_*`)**: Pick the smallest tool that answers the question (`find_symbol`/`resolve_symbol` -> `find_callers`/`get_callers`, `find_routes`/`list_routes` -> `trace_path`, `search_code` -> `get_file`, or `get_context`). Stop as soon as verified evidence answers the question.
-4. **Preserve Semantic Distinctions**: Never invent relationships and never collapse `REGISTERS`, `DISPATCHES_TO`, `MOUNTS`, `INJECTS`, `PROVIDES`, or `RESOLVES_DEPENDENCY` into generic `CALLS`. `search_code` returns literal text hits only and never creates semantic graph edges.
+4. **Preserve Semantic Distinctions**: Never invent relationships or collapse `REGISTERS`, `DISPATCHES_TO`, `MOUNTS`, `INJECTS`, `PROVIDES`, or `RESOLVES_DEPENDENCY` into generic `CALLS`. `search_code` returns literal text hits only and never creates semantic graph edges.
 5. **Targeted Source Reads After Discovery (`get_file` / `read_file`)**: Once `search_code`, `find_symbol`, `find_routes`, or `get_context` identifies the target file and line range, call `get_file(path, start_line=..., end_line=..., max_lines=200)` (or `read_file`) to open only the needed lines.
 6. **Anti-Loop Discipline**: Never call `resolve_symbol` or `find_symbol` repeatedly for the same symbol or spam redundant CodeGraph tools once a `canonical_id` or `ContextPacket` is obtained.
 
