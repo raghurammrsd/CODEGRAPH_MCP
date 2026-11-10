@@ -13,7 +13,7 @@
   <a href="https://github.com/raghurammrsd/CODEGRAPH_MCP"><img src="https://img.shields.io/github/stars/raghurammrsd/CODEGRAPH_MCP?style=for-the-badge&logo=github&color=gold" alt="GitHub Stars" /></a>
   <a href="https://pypi.org/project/codegraph-engine/"><img src="https://img.shields.io/badge/pypi-codegraph--engine-3776AB.svg?style=for-the-badge&logo=pypi" alt="PyPI: codegraph-engine" /></a>
   <a href="src/codegraph/mcp/server.py"><img src="https://img.shields.io/badge/MCP-97%20Verified%20Tools-2ea043.svg?style=for-the-badge" alt="MCP Tools: 97 verified" /></a>
-  <a href="tests/"><img src="https://img.shields.io/badge/pytest-1062%20passed%20(100%25)-brightgreen.svg?style=for-the-badge&logo=pytest" alt="Tests: 1062 passed" /></a>
+  <a href="tests/"><img src="https://img.shields.io/badge/pytest-1074%20passed%20(100%25)-brightgreen.svg?style=for-the-badge&logo=pytest" alt="Tests: 1074 passed" /></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/ruff-0%20errors-success.svg?style=for-the-badge" alt="Ruff: 0 errors" /></a>
   <a href="src/codegraph/"><img src="https://img.shields.io/badge/mypy-strict%20(134%20files)-blue.svg?style=for-the-badge" alt="Mypy: strict" /></a>
 </p>
@@ -296,6 +296,23 @@ With CodeGraph MCP (Targeted AST Slices & Evidence):
 ---
 
 ## 2. Quickstart & Agent Installation
+
+### Instant Setup: Connect Your AI Editor (`codegraph connect`)
+
+Connect all your AI coding agents to CodeGraph with one command. By default, this configures the **opinionated `core12` profile** (12 essential tools, cutting prompt token overhead by 92%):
+
+```bash
+# Connect all detected AI editors (Cursor, Claude Code, Antigravity, Cline)
+codegraph connect
+
+# Connect with a shared team BYOC PostgreSQL database (Supabase, Neon, AWS RDS)
+codegraph connect --db-url "postgres://user:password@db.supabase.co:5432/codegraph"
+
+# Connect with specific profile (e.g. core12, agent, or full)
+codegraph connect --profile core12
+```
+
+---
 
 ### Step 1: Install `codegraph-engine`
 
@@ -925,16 +942,90 @@ By default, `create_server()` exposes the **14-tool `agent` profile** so AI codi
 | **Graph Tracing (2)** | `trace_path` | Find the shortest verified execution path between `from_symbol` and `to_symbol`. |
 | | `trace_flow` | Trace upstream callers and downstream callees around `symbol` up to `depth`. |
 
-### All 6 Implemented MCP Profiles ([`src/codegraph/agent_capabilities.py`](src/codegraph/agent_capabilities.py))
+### The Opinionated `core12` Profile (Recommended for AI Coding Agents)
+
+Injecting 97 tools into an LLM context window burns ~14,400 tokens on startup and increases router ambiguity when tools share similar semantics (e.g. `find_callers` vs `get_callers`). 
+
+The **`core12` profile** (`--profile core12`) reduces the prompt footprint by **92%** (~1,150 tokens) and exposes the single best tool for each agent workflow:
+
+| Category | Tool | Description |
+| :--- | :--- | :--- |
+| **Definitions** | `find_symbol` | Locate symbol definitions by short, qualified, or canonical name. |
+| **Call Hierarchy** | `get_callers` | Upstream callers, route handlers, and references reaching a symbol. |
+| | `get_callees` | Downstream functions, methods, and constructors invoked by a symbol. |
+| **Web & APIs** | `find_routes` | Map HTTP endpoints and router mount hierarchies with parameter bindings. |
+| **Targeted Reading** | `read_file_range` | Read only the specific line slice needed (`start_line`, `end_line`, `max_lines`). |
+| | `get_file_outline` | AST outline showing classes, methods, and line boundaries in a file. |
+| **Git & Safety** | `analyze_change_impact` | Deterministic blast radius and affected downstream callers/routes for a git diff. |
+| **Database** | `find_db_models` | Database tables, ORM models (SQLAlchemy, Django, Prisma), and column types. |
+| | `get_schema_impact` | Migration safety analysis and breaking schema changes across models. |
+| **Testing** | `find_tests_for_symbol` | Test suites, test functions, and fixtures covering a target symbol. |
+| **Refactoring** | `safe_rename_symbol` | AST-aware multi-file symbol renames across imports and call sites. |
+| **Architecture** | `get_architecture_summary` | High-level repo breakdown: languages, frameworks, entrypoints, and DB models. |
+
+---
+
+### All MCP Profiles ([`src/codegraph/agent_capabilities.py`](src/codegraph/agent_capabilities.py))
 
 | Profile | Tool Count | Description |
 | :--- | :---: | :--- |
+| **`core12`** *(recommended for agents)* | **12** | Opinionated 12-tool surface cutting prompt tokens by 92% (~1,150 tokens). |
 | **`agent`** *(default in `create_server`)* | **14** | High-signal discovery, bounded file inspection, context synthesis, and path tracing. |
 | **`core`** | **13** | Lightweight symbol lookup, callers/callees, imports/dependents, routes, and architecture. |
 | **`graph`** | **17** | Call-graph traversal, blast-radius impact (`analyze_impact`), and test discovery. |
 | **`minimal`** | **21** | Core interrogation plus `get_context`, `search_code`, `read_file`, and `verify_evidence`. |
 | **`developer`** | **34** | Interactive development with Git history (`get_file_history`, `get_recent_changes`) and retrieval planning. |
 | **`full`** | **97** | Complete capability surface including **18 Symbol tools**, **16 Call Graph tools**, **11 Database tools**, **9 Blast Radius tools**, **9 Multi-Agent & Memory tools**, **7 Refactoring & Patch tools**, **6 Route & Drift tools**, **6 Security & Rule tools**, and **9 File/Maintenance tools**. |
+
+---
+
+## 13. Bring Your Own Cloud (BYOC) PostgreSQL Storage
+
+CodeGraph supports **any PostgreSQL-compatible database** (Supabase, Neon, AWS RDS, CockroachDB, Azure Cosmos DB) via `CODEGRAPH_DATABASE_URL` with automatic local SQLite fallback.
+
+```text
+┌───────────────────────────────────────────────────────────────────┐
+│                       DEVELOPER MACHINE                           │
+│                                                                   │
+│   Cursor / Claude Desktop / Antigravity                           │
+│             │                                                     │
+│             ▼ (MCP stdio)                                         │
+│   CodeGraph Engine                                                │
+│             │                                                     │
+│             ├── [Offline / Fast Cache] ──► Local SQLite (< 1ms)   │
+│             └── [Shared Team Graph] ──► Remote PostgreSQL         │
+└───────────────────────────────────────────────┬───────────────────┘
+                                                │
+                                                ▼ (TLS 1.3 / Port 5432)
+┌───────────────────────────────────────────────────────────────────┐
+│              COMPANY CLOUD (Supabase / Neon / AWS RDS)            │
+│   • 22 Schema Tables (AST Symbols, Call Edges, Routes, Lineage)   │
+│   • Indexed on CI merge to `main`                                 │
+│   • Shared across the entire engineering team                     │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### Setup & Management Commands
+
+```bash
+# 1. Initialize schema and 34 indexes in your PostgreSQL database
+codegraph db init --url "postgres://postgres:password@db.supabase.co:5432/codegraph"
+
+# 2. Check connection health and latency
+codegraph db check
+
+# 3. View table statistics and row counts across both SQLite and PostgreSQL
+codegraph db status
+
+# 4. Connect AI editors to the shared database with opinionated core12 tools
+codegraph connect --db-url "postgres://postgres:password@db.supabase.co:5432/codegraph"
+```
+
+### Why Remote PostgreSQL Costs Almost $0.00 / Month
+For a 100,000 to 500,000-line codebase:
+- **AST Symbols & Edges**: ~50,000 to ~250,000 rows.
+- **Database Size on Disk**: ~80 MB to 350 MB.
+- **Hosting Cost**: Fits completely inside the **Free Tier** of Supabase (500 MB free) and Neon (0.5 GB free), or ~$12/month on an AWS RDS `db.t4g.micro` instance.
 
 ---
 

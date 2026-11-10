@@ -751,18 +751,33 @@ def remove_marker_section(
 # ---------------------------------------------------------------------------
 
 
-def build_agent_mcp_entry(agent_id: str, command: str = "codegraph") -> dict[str, Any]:
+def build_agent_mcp_entry(
+    agent_id: str,
+    command: str = "codegraph",
+    profile: str | None = None,
+    db_url: str | None = None,
+) -> dict[str, Any]:
     """Return the canonical `mcpServers.codegraph` object for `agent_id`."""
+    args = ["mcp", "serve"]
+    if profile:
+        args.extend(["--profile", profile])
     entry: dict[str, Any] = {
         "command": command,
-        "args": ["mcp", "serve"],
+        "args": args,
     }
+    if db_url:
+        entry["env"] = {"CODEGRAPH_DATABASE_URL": db_url}
     if agent_id == "cline":
         entry["disabled"] = False
     return entry
 
 
-def render_agent_mcp_config_snippet(agent_id: str, command: str = "codegraph") -> dict[str, Any]:
+def render_agent_mcp_config_snippet(
+    agent_id: str,
+    command: str = "codegraph",
+    profile: str | None = None,
+    db_url: str | None = None,
+) -> dict[str, Any]:
     """Return full top-level MCP config JSON snippet for `--print-config`."""
     canon = AGENT_ALIASES.get(agent_id.strip().lower(), agent_id.strip().lower())
     if canon not in AGENT_DISPLAY_NAMES:
@@ -776,7 +791,7 @@ def render_agent_mcp_config_snippet(agent_id: str, command: str = "codegraph") -
         )
     return {
         "mcpServers": {
-            "codegraph": build_agent_mcp_entry(canon, command=command),
+            "codegraph": build_agent_mcp_entry(canon, command=command, profile=profile, db_url=db_url),
         }
     }
 
@@ -787,13 +802,15 @@ def upsert_mcp_json_config(
     display_path: str,
     command: str = "codegraph",
     allow_malformed_repair: bool = False,
+    profile: str | None = None,
+    db_url: str | None = None,
 ) -> tuple[str, str, str | None]:
     """Create, update, or repair `mcpServers.codegraph` in a JSON configuration file.
 
     Preserves all unrelated top-level keys and other MCP servers.
     Returns `(new_json_text, action, repair_reason)`.
     """
-    desired_entry = build_agent_mcp_entry(agent_id, command=command)
+    desired_entry = build_agent_mcp_entry(agent_id, command=command, profile=profile, db_url=db_url)
 
     if existing_text is None:
         doc = {"mcpServers": {"codegraph": desired_entry}}
@@ -870,11 +887,12 @@ def upsert_mcp_json_config(
         else:
             cmd_val = existing_cg.get("command")
             args_val = existing_cg.get("args")
+            desired_args = desired_entry.get("args", ["mcp", "serve"])
             if (
                 not isinstance(cmd_val, str)
                 or not cmd_val.strip()
                 or not isinstance(args_val, list)
-                or args_val != ["mcp", "serve"]
+                or (args_val != ["mcp", "serve"] and args_val != desired_args)
             ):
                 repair_reason = f"Repaired incomplete or outdated 'mcpServers.codegraph' entry in '{display_path}'."
 
@@ -1079,7 +1097,14 @@ def verify_installation(
                 no_dup_ok = False
                 mcp_ok = False
             cg = servers.get("codegraph", {})
-            if not isinstance(cg, dict) or not cg.get("command") or cg.get("args") != ["mcp", "serve"]:
+            cg_args = cg.get("args") if isinstance(cg, dict) else None
+            if (
+                not isinstance(cg, dict)
+                or not cg.get("command")
+                or not isinstance(cg_args, list)
+                or len(cg_args) < 2
+                or cg_args[:2] != ["mcp", "serve"]
+            ):
                 mcp_ok = False
         except Exception as exc:
             mcp_ok = False
@@ -1153,6 +1178,8 @@ def plan_install_changes(
     location: str,
     command: str = "codegraph",
     allow_malformed_repair: bool = False,
+    profile: str | None = None,
+    db_url: str | None = None,
 ) -> tuple[list[PlannedFileChange], list[str], list[str]]:
     """Compute all deterministic file operations for `install` without writing to disk."""
     planned: list[PlannedFileChange] = []
@@ -1177,6 +1204,8 @@ def plan_install_changes(
                     display_path=disp,
                     command=command,
                     allow_malformed_repair=allow_malformed_repair,
+                    profile=profile,
+                    db_url=db_url,
                 )
                 if repair_msg:
                     repairs.append(repair_msg)
@@ -1334,6 +1363,8 @@ def run_install(
     which_fn: Callable[[str], str | None] | None = None,
     confirm_fn: Callable[[InstallerReport], bool] | None = None,
     run_server_check: bool = True,
+    profile: str | None = None,
+    db_url: str | None = None,
 ) -> InstallerReport:
     """Execute or preview `codegraph install` with full safety, idempotency, and verification."""
     effective_ws = workspace.resolve()
@@ -1359,6 +1390,8 @@ def run_install(
         location=scope,
         command="codegraph",
         allow_malformed_repair=allow_malformed_repair,
+        profile=profile,
+        db_url=db_url,
     )
 
     from codegraph.process_lifecycle import (

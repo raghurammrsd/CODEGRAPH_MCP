@@ -1472,6 +1472,14 @@ def install(
     ] = None,
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would change without modifying any files")] = False,
     repair: Annotated[bool, typer.Option("--repair", help="Back up and repair malformed JSON configuration files")] = False,
+    profile: Annotated[
+        str | None,
+        typer.Option("--profile", "-p", help="MCP tool profile: core12 | agent | core | graph | developer | full"),
+    ] = None,
+    db_url: Annotated[
+        str | None,
+        typer.Option("--db-url", help="PostgreSQL connection URL for team BYOC database"),
+    ] = None,
     json_output: Annotated[bool, typer.Option("--json", help="Output deterministic machine-readable JSON")] = False,
 ) -> None:
     """Detect supported AI agents, configure CodeGraph MCP, install rules/skills, and verify health."""
@@ -1486,7 +1494,7 @@ def install(
     if print_config is not None:
         try:
             canon = AGENT_ALIASES.get(print_config.strip().lower(), print_config.strip().lower())
-            snippet = render_agent_mcp_config_snippet(canon)
+            snippet = render_agent_mcp_config_snippet(canon, profile=profile, db_url=db_url)
             from codegraph.agent_rules import render_agent_rules
 
             rules_txt = render_agent_rules(canon)
@@ -1544,6 +1552,8 @@ def install(
             dry_run=dry_run,
             allow_malformed_repair=repair,
             confirm_fn=None if (yes or dry_run) else _confirm,
+            profile=profile,
+            db_url=db_url,
         )
     except CodeGraphError as exc:
         if json_output:
@@ -1563,6 +1573,78 @@ def install(
             cli_echo(report.format_preview_human())
             cli_echo("")
         cli_echo(report.format_human())
+
+    if report.status == "error":
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def connect(
+    path: Annotated[Path | None, typer.Argument(help="Project path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Project path")] = None,
+    target: Annotated[
+        str,
+        typer.Option("--target", "-t", help="Target agents/editors: all | auto | cursor,claude,antigravity,cline,codex,gemini"),
+    ] = "all",
+    profile: Annotated[
+        str,
+        typer.Option("--profile", "-p", help="MCP tool profile (default: core12 for 92% token savings)"),
+    ] = "core12",
+    location: Annotated[
+        str,
+        typer.Option("--location", "-l", help="Installation scope: local | global"),
+    ] = "local",
+    db_url: Annotated[
+        str | None,
+        typer.Option("--db-url", help="PostgreSQL connection string for team BYOC database"),
+    ] = None,
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Confirm connection without interactive prompt")] = True,
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would change without modifying files")] = False,
+    repair: Annotated[bool, typer.Option("--repair", help="Back up and repair malformed JSON configuration files")] = False,
+    json_output: Annotated[bool, typer.Option("--json", help="Output deterministic machine-readable JSON")] = False,
+) -> None:
+    """Connect CodeGraph to your AI editors (Cursor, Claude, Antigravity) with opinionated profile (default: core12)."""
+    ws = _resolve_repo(path, repository)
+    from codegraph.errors import CodeGraphError
+    from codegraph.installer import run_install
+
+    effective_db = db_url or os.environ.get("CODEGRAPH_DATABASE_URL")
+    try:
+        report = run_install(
+            workspace=ws,
+            target=target,
+            location=location,
+            dry_run=dry_run,
+            allow_malformed_repair=repair,
+            confirm_fn=None,
+            profile=profile,
+            db_url=effective_db,
+        )
+    except CodeGraphError as exc:
+        if json_output:
+            cli_echo(json.dumps(exc.to_response(), indent=2), json_mode=True)
+        else:
+            cli_echo(f"Error [{exc.code}]: {exc.message}")
+        raise typer.Exit(code=1) from exc
+
+    if json_output:
+        res = report.as_dict()
+        res["profile"] = profile
+        if effective_db:
+            from codegraph.indexing.storage import redact_db_url
+
+            res["database_url"] = redact_db_url(effective_db)
+        cli_echo(json.dumps(res, indent=2), json_mode=True)
+    else:
+        cli_echo(report.format_human())
+        if not dry_run and report.status == "ok":
+            cli_echo(f"\n  + Configured MCP profile: {profile}")
+            if effective_db:
+                from codegraph.indexing.storage import redact_db_url
+
+                cli_echo(f"  + Connected remote DB: {redact_db_url(effective_db)}")
+            else:
+                cli_echo("  + Storage: Local SQLite (.codegraph.sqlite3)")
 
     if report.status == "error":
         raise typer.Exit(code=1)
