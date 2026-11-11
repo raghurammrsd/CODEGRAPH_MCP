@@ -756,6 +756,7 @@ class Indexer:
         indexed = unchanged = parse_failed_count = 0
         stale: list[str] = []
         dirty_files: set[str] = set()
+        body_only_files: set[str] = set()
         files = []
         telemetry = IndexingTelemetry()
         self.last_telemetry = telemetry
@@ -916,7 +917,7 @@ class Indexer:
                             progress_callback("ast_parsing", idx + 1, total_pending, telemetry)
 
                         pre_res = parse_results.get(relative)
-                        success = self._replace_file(
+                        success, is_body_only = self._replace_file(
                             con,
                             relative,
                             item.language,
@@ -932,6 +933,8 @@ class Indexer:
                         if success:
                             indexed += 1
                             dirty_files.add(relative)
+                            if is_body_only:
+                                body_only_files.add(relative)
                             existing_files[relative] = (digest, "ok")
                         else:
                             parse_failed_count += 1
@@ -1003,11 +1006,24 @@ class Indexer:
                         telemetry.record("sqlite_writes", time.perf_counter() - t_commit, db_writes=1)
                         uncommitted_in_batch = 0
 
-                    # Run global reference resolution pass if any files were changed, removed, or pending from interrupt
+                    # Run reference resolution pass if any files were changed, removed, or pending from interrupt
                     if need_resolution:
-                        with telemetry.phase("post_processing") as p_post:
-                            if progress_callback is not None:
-                                progress_callback("post_processing", total_files, total_files, telemetry)
+                        is_strictly_body_only = (
+                            indexed > 0
+                            and len(dirty_files) == len(body_only_files)
+                            and len(stale) == 0
+                            and not force_reparse
+                            and not resolution_dirty
+                        )
+                        if is_strictly_body_only:
+                            self._run_body_only_resolution(
+                                con,
+                                head_commit,
+                                dirty_files=dirty_files,
+                                telemetry=telemetry,
+                                progress_callback=progress_callback,
+                            )
+                        else:
                             self._run_global_resolution(
                                 con,
                                 head_commit,
@@ -1016,9 +1032,17 @@ class Indexer:
                                 telemetry=telemetry,
                                 progress_callback=progress_callback,
                             )
+
+                        with telemetry.phase("post_processing") as p_post:
+                            if progress_callback is not None:
+                                progress_callback("post_processing", total_files, total_files, telemetry)
                             from codegraph.async_queue import AsyncQueueScanner
 
-                            AsyncQueueScanner(self.repository).scan_repository(con)
+                            AsyncQueueScanner(self.repository).scan_repository(
+                                con,
+                                dirty_files=dirty_files if not (force_reparse or resolution_dirty) else None,
+                                removed_files=set(stale) if not (force_reparse or resolution_dirty) else None,
+                            )
                             p_post.files_processed = indexed + len(stale)
                             p_post.items_processed = indexed + len(stale)
                             # Invalidate context cache on index update
@@ -1027,7 +1051,8 @@ class Indexer:
                                 con.execute("DELETE FROM context_cache")
                             except sqlite3.OperationalError:
                                 pass
-                            telemetry.record("ranking_index_building", time.perf_counter() - t_rank, db_writes=1)
+                            if not is_strictly_body_only:
+                                telemetry.record("ranking_index_building", time.perf_counter() - t_rank, db_writes=1)
 
                     # Final commit & WAL checkpoint
                     with telemetry.phase("final_commit_checkpoint") as p_final:
@@ -1235,6 +1260,7 @@ class Indexer:
             # 3. Apply atomic updates
             self.governor.set_indexing_active(True)
             reindexed: list[str] = []
+            body_only_files: set[str] = set()
             parse_failed: list[str] = []
 
             for del_path in to_delete:
@@ -1242,7 +1268,7 @@ class Indexer:
 
             for rel_path, lang, content, digest, is_existing in to_update:
                 cat_info = classify_file_detailed(Path(rel_path), content)
-                success = self._replace_file(
+                success, is_body_only = self._replace_file(
                     con,
                     rel_path,
                     lang,
@@ -1253,6 +1279,8 @@ class Indexer:
                 )
                 if success:
                     reindexed.append(rel_path)
+                    if is_body_only:
+                        body_only_files.add(rel_path)
                 else:
                     parse_failed.append(rel_path)
 
@@ -1263,16 +1291,27 @@ class Indexer:
             dirty_set = set(reindexed)
             removed_set = set(to_delete)
 
-            self._run_global_resolution(
-                con,
-                head_commit,
-                dirty_files=dirty_set,
-                removed_files=removed_set,
-            )
+            if dirty_set and not removed_set and len(dirty_set) == len(body_only_files):
+                self._run_body_only_resolution(
+                    con,
+                    head_commit,
+                    dirty_files=dirty_set,
+                )
+            else:
+                self._run_global_resolution(
+                    con,
+                    head_commit,
+                    dirty_files=dirty_set,
+                    removed_files=removed_set,
+                )
 
             from codegraph.async_queue import AsyncQueueScanner
 
-            AsyncQueueScanner(self.repository).scan_repository(con)
+            AsyncQueueScanner(self.repository).scan_repository(
+                con,
+                dirty_files=dirty_set,
+                removed_files=removed_set,
+            )
 
             # Invalidate context cache on index update
             try:
@@ -1441,7 +1480,7 @@ class Indexer:
                 )
             if telemetry is not None:
                 telemetry.record("sqlite_writes", time.perf_counter() - t_sql, files_processed=1, db_writes=1)
-            return False
+            return False, False
 
         t_sql = time.perf_counter()
         db_write_count = 0
@@ -1449,7 +1488,9 @@ class Indexer:
         fts_write_count = 0
 
         # Successful parse: clean up old file state only if file previously existed in DB
+        is_body_only = False
         if is_existing:
+            is_body_only = self._is_body_only_change(con, path, result)
             self._delete_file(con, path, telemetry=telemetry)
             db_write_count += 16
 
@@ -1463,7 +1504,7 @@ class Indexer:
         if category in ("MINIFIED", "BUNDLE", "BINARY"):
             if telemetry is not None:
                 telemetry.record("sqlite_writes", time.perf_counter() - t_sql, files_processed=1, db_writes=db_write_count)
-            return True
+            return True, False
 
         lines = content.splitlines()
 
@@ -1762,7 +1803,307 @@ class Indexer:
                     db_writes=fts_write_count,
                 )
 
+        return True, is_body_only
+
+    def _is_body_only_change(
+        self,
+        con: sqlite3.Connection,
+        path: str,
+        result: Any,
+    ) -> bool:
+        """Check if parsed result differs from existing indexed records only in internal implementation."""
+        if getattr(result, "parse_failed", False):
+            return False
+
+        # 1. Compare symbols: canonical_id, kind, signature, decorators
+        old_syms = con.execute(
+            "SELECT canonical_id, kind, signature, decorators FROM symbols WHERE path=? ORDER BY canonical_id",
+            (path,),
+        ).fetchall()
+        new_syms = sorted(
+            [
+                (
+                    s.canonical_id,
+                    s.kind,
+                    s.signature or "",
+                    ",".join(s.decorators) if s.decorators else "",
+                )
+                for s in result.symbols
+            ],
+            key=lambda x: x[0],
+        )
+        if len(old_syms) != len(new_syms):
+            return False
+        for old_s, new_s in zip(old_syms, new_syms):
+            if (old_s[0], old_s[1], old_s[2] or "", old_s[3] or "") != new_s:
+                return False
+
+        # 2. Compare imports: module, name, imported_module, imported_name, import_type
+        old_imps = con.execute(
+            "SELECT module, name, imported_module, imported_name, import_type FROM imports WHERE source_path=? ORDER BY module, name",
+            (path,),
+        ).fetchall()
+        new_imps = sorted(
+            [
+                (
+                    imp.module or "",
+                    imp.name or "",
+                    imp.imported_module or "",
+                    imp.imported_name or "",
+                    imp.import_type or "",
+                )
+                for imp in result.imports
+            ],
+            key=lambda x: (x[0], x[1]),
+        )
+        if len(old_imps) != len(new_imps):
+            return False
+        for old_i, new_i in zip(old_imps, new_imps):
+            if (old_i[0] or "", old_i[1] or "", old_i[2] or "", old_i[3] or "", old_i[4] or "") != new_i:
+                return False
+
+        # 3. Compare routes
+        old_routes = con.execute(
+            "SELECT endpoint_id, http_method, route_path FROM raw_framework_routes WHERE file_path=? ORDER BY endpoint_id",
+            (path,),
+        ).fetchall()
+        new_routes = sorted(
+            [
+                (
+                    getattr(r, "endpoint_id_override", None) or f"{r.framework}:{r.http_method}:{r.route_path}:{path}:{r.line}",
+                    r.http_method,
+                    r.route_path,
+                )
+                for r in result.routes
+            ],
+            key=lambda x: x[0],
+        )
+        if len(old_routes) != len(new_routes):
+            return False
+
+        # 4. Compare inheritance
+        old_inh = con.execute(
+            "SELECT source_symbol, base_name FROM inheritance WHERE source_file=? ORDER BY source_symbol, base_name",
+            (path,),
+        ).fetchall()
+        new_inh = sorted(
+            [(inh.source_symbol, inh.base_name) for inh in result.inheritance],
+            key=lambda x: (x[0], x[1]),
+        )
+        if len(old_inh) != len(new_inh):
+            return False
+
         return True
+
+    def _run_body_only_resolution(
+        self,
+        con: sqlite3.Connection,
+        indexed_commit: str | None,
+        *,
+        dirty_files: set[str],
+        telemetry: IndexingTelemetry | None = None,
+        progress_callback: Callable[[str, int, int, IndexingTelemetry], None] | None = None,
+    ) -> None:
+        """Fast-path resolution for body-only changes where signatures and interfaces are invariant."""
+        t_start = time.perf_counter()
+
+        # Delete previous graph edges for dirty files
+        pl = ",".join("?" for _ in dirty_files)
+        con.execute(f"DELETE FROM graph_edges WHERE file IN ({pl})", list(dirty_files))
+
+        # 1. Load symbols
+        sym_rows = con.execute(
+            "SELECT name, qualified_name, kind, path, start_line, end_line, decorators, "
+            "id, canonical_id, language, module, scope, signature, content_hash, "
+            "parent_symbol_id, visibility, return_type, parameter_count, documentation "
+            "FROM symbols"
+        ).fetchall()
+        symbols = [
+            Symbol(
+                id=str(r["id"]),
+                canonical_id=str(r["canonical_id"]),
+                name=str(r["name"]),
+                qualified_name=str(r["qualified_name"]),
+                kind=str(r["kind"]),
+                start_line=int(r["start_line"]),
+                end_line=int(r["end_line"]),
+                file_path=str(r["path"]),
+                decorators=[d for d in str(r["decorators"]).split(",") if d],
+                language=str(r["language"]),
+                module=str(r["module"]),
+                path=str(r["path"]),
+                scope=str(r["scope"]),
+                signature=str(r["signature"]),
+                content_hash=str(r["content_hash"]),
+                parent_symbol_id=r["parent_symbol_id"],
+                visibility=str(r["visibility"]),
+                return_type=r["return_type"],
+                parameter_count=r["parameter_count"],
+                documentation=r["documentation"],
+            )
+            for r in sym_rows
+        ]
+
+        # 2. Load imports only for dirty files
+        imp_rows = con.execute(
+            f"SELECT source_path, module, name, alias, full_name, line, "
+            f"source_module, imported_module, imported_name, local_name, import_type "
+            f"FROM imports WHERE source_path IN ({pl})",
+            list(dirty_files),
+        ).fetchall()
+        imports = [
+            ImportRef(
+                module=str(r["module"]),
+                source_file=str(r["source_path"]),
+                name=r["name"],
+                alias=r["alias"],
+                full=r["full_name"],
+                line=int(r["line"]),
+                source_module=str(r["source_module"]),
+                imported_module=str(r["imported_module"]),
+                imported_name=r["imported_name"],
+                local_name=str(r["local_name"]),
+                import_type=str(r["import_type"]),
+                is_reexport=(str(r["import_type"]) == "reexport"),
+            )
+            for r in imp_rows
+        ]
+
+        # 3. Load calls only for dirty files
+        call_rows = con.execute(
+            f"SELECT source_path, callee, qualified_callee, line, confidence, source_symbol_id "
+            f"FROM calls WHERE source_path IN ({pl})",
+            list(dirty_files),
+        ).fetchall()
+        calls = [
+            CallRef(
+                callee=str(r["callee"]),
+                source_file=str(r["source_path"]),
+                confidence=str(r["confidence"]),
+                qualified_callee=r["qualified_callee"],
+                line=int(r["line"]),
+                caller_canonical_id=r["source_symbol_id"],
+            )
+            for r in call_rows
+        ]
+
+        # 4. Load local bindings only for dirty files
+        binding_rows = con.execute(
+            f"SELECT target_name, file_path, line, column, scope, expr_kind, source_expr, "
+            f"is_conditional, base_expr, attr_name, dict_entries_json, list_entries_json, "
+            f"subscript_target, subscript_key, subscript_index "
+            f"FROM local_bindings WHERE file_path IN ({pl})",
+            list(dirty_files),
+        ).fetchall()
+        bindings = [
+            BindingRef(
+                target_name=str(r["target_name"]),
+                file_path=str(r["file_path"]),
+                line=int(r["line"]),
+                column=r["column"],
+                scope=str(r["scope"]),
+                expr_kind=str(r["expr_kind"]),
+                source_expr=str(r["source_expr"]),
+                is_conditional=bool(r["is_conditional"]),
+                base_expr=str(r["base_expr"]),
+                attr_name=str(r["attr_name"]),
+                dict_entries=tuple(tuple(x) for x in json.loads(r["dict_entries_json"])),
+                list_entries=tuple(json.loads(r["list_entries_json"])),
+                subscript_target=r["subscript_target"],
+                subscript_key=r["subscript_key"],
+                subscript_index=r["subscript_index"],
+            )
+            for r in binding_rows
+        ]
+
+        t_res_start = time.perf_counter()
+        file_hashes = {f: "" for f in dirty_files}
+        resolver = ReferenceResolver(
+            symbols=symbols,
+            imports=imports,
+            calls=calls,
+            inheritance=[],
+            routes=[],
+            mount_edges=[],
+            known_files=dirty_files,
+            file_hashes=file_hashes,
+            indexed_commit=indexed_commit,
+            bindings=bindings,
+            repository=self.repository,
+            max_reexport_depth=self.max_reexport_depth,
+            max_wildcard_expansions=self.max_wildcard_expansions,
+        )
+        output = resolver.resolve_all(target_files=dirty_files)
+        self.last_epistemic_findings = list(output.findings)
+        t_res_dur = time.perf_counter() - t_res_start
+
+        # Insert resolved edges
+        t_sql = time.perf_counter()
+        if output.edges:
+            con.executemany(
+                "INSERT INTO graph_edges("
+                "source, target, relationship, confidence, file, start_line, end_line, "
+                "evidence, evidence_id, source_hash, indexed_commit, evidence_class) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                [
+                    (
+                        e.source,
+                        e.target,
+                        e.relationship,
+                        e.confidence,
+                        e.file,
+                        e.start_line,
+                        e.end_line,
+                        e.evidence,
+                        f"edge_{idx}",
+                        "",
+                        indexed_commit,
+                        getattr(e, "evidence_class", "AST_VERIFIED"),
+                    )
+                    for idx, e in enumerate(output.edges)
+                ],
+            )
+
+        # Update resolved calls and imports
+        for (src_path, ln, loc_name), (tgt_path, tgt_mod) in output.resolved_imports.items():
+            con.execute(
+                "UPDATE imports SET resolved_path=?, resolved_module=? "
+                "WHERE source_path=? AND line=? AND (local_name=? OR alias=? OR name=?)",
+                (tgt_path, tgt_mod, src_path, ln, loc_name, loc_name, loc_name),
+            )
+
+        for (src_path, ln, callee_nm), (resolved_id, conf) in output.resolved_calls.items():
+            con.execute(
+                "UPDATE calls SET resolved_symbol_id=?, confidence=? "
+                "WHERE source_path=? AND line=? AND callee=?",
+                (resolved_id, conf, src_path, ln, callee_nm),
+            )
+
+        if telemetry is not None:
+            telemetry.record(
+                "symbol_resolution",
+                time.perf_counter() - t_start - t_res_dur,
+                files_processed=len(dirty_files),
+                items_processed=len(dirty_files),
+            )
+            telemetry.record(
+                "relationship_resolution",
+                t_res_dur,
+                files_processed=len(dirty_files),
+                items_processed=len(output.edges),
+            )
+            telemetry.record(
+                "ranking_index_building",
+                0.0,
+                files_processed=len(dirty_files),
+                items_processed=0,
+            )
+            telemetry.record(
+                "sqlite_writes",
+                time.perf_counter() - t_sql,
+                files_processed=len(dirty_files),
+                db_writes=len(output.edges),
+            )
 
     def _run_global_resolution(
         self,
@@ -1783,6 +2124,86 @@ class Indexer:
         known_files = {str(r["path"]) for r in file_rows}
         file_hashes = {str(r["path"]): str(r["hash"]) for r in file_rows}
         file_langs = {str(r["path"]): str(r["language"]) for r in file_rows}
+
+        # Determine if incremental relationship resolution can be safely applied
+        dirty_resolvers: set[str] | None = None
+        if dirty_files is not None:
+            changed_or_removed = set(dirty_files) | set(removed_files or ())
+            threshold = max(64, len(known_files) // 4)
+            if 0 < len(changed_or_removed) <= threshold:
+                resolvers: set[str] = set(dirty_files) & known_files
+
+                # 1. Reverse imports: find all files importing modules corresponding to changed files
+                changed_modules: set[str] = set()
+                for f in changed_or_removed:
+                    mod = normalize_module(f)
+                    if mod:
+                        changed_modules.add(mod)
+                        if "." in mod:
+                            changed_modules.add(mod.rsplit(".", 1)[0])
+
+                chunk_sz = 900
+                if changed_modules:
+                    mod_list = list(changed_modules)
+                    for ci in range(0, len(mod_list), chunk_sz):
+                        chunk = mod_list[ci : ci + chunk_sz]
+                        pl = ",".join("?" for _ in chunk)
+                        rows = con.execute(
+                            f"SELECT DISTINCT source_path FROM imports WHERE module IN ({pl}) OR imported_module IN ({pl})",
+                            chunk + chunk,
+                        ).fetchall()
+                        for r in rows:
+                            sp = str(r[0])
+                            if sp in known_files:
+                                resolvers.add(sp)
+
+                # 2. Reverse calls & tests: find callers/tests targeting symbols declared in changed files
+                cr_list = list(changed_or_removed)
+                changed_sym_names: set[str] = set()
+                changed_sym_canons: set[str] = set()
+                for ci in range(0, len(cr_list), chunk_sz):
+                    chunk = cr_list[ci : ci + chunk_sz]
+                    pl = ",".join("?" for _ in chunk)
+                    rows = con.execute(
+                        f"SELECT name, canonical_id FROM symbols WHERE path IN ({pl})",
+                        chunk,
+                    ).fetchall()
+                    for r in rows:
+                        if r[0]:
+                            changed_sym_names.add(str(r[0]))
+                        if r[1]:
+                            changed_sym_canons.add(str(r[1]))
+
+                if changed_sym_names:
+                    name_list = list(changed_sym_names)
+                    for ci in range(0, len(name_list), chunk_sz):
+                        chunk = name_list[ci : ci + chunk_sz]
+                        pl = ",".join("?" for _ in chunk)
+                        rows = con.execute(
+                            f"SELECT DISTINCT source_path FROM calls WHERE callee IN ({pl})",
+                            chunk,
+                        ).fetchall()
+                        for r in rows:
+                            sp = str(r[0])
+                            if sp in known_files:
+                                resolvers.add(sp)
+
+                if changed_sym_canons:
+                    canon_list = list(changed_sym_canons)
+                    for ci in range(0, len(canon_list), chunk_sz):
+                        chunk = canon_list[ci : ci + chunk_sz]
+                        pl = ",".join("?" for _ in chunk)
+                        rows = con.execute(
+                            f"SELECT DISTINCT file FROM graph_edges WHERE target IN ({pl})",
+                            chunk,
+                        ).fetchall()
+                        for r in rows:
+                            sp = str(r[0])
+                            if sp in known_files:
+                                resolvers.add(sp)
+
+                if len(resolvers) <= threshold:
+                    dirty_resolvers = resolvers
 
         # 2. Load symbols
         sym_rows = con.execute(
@@ -1842,10 +2263,18 @@ class Indexer:
         ]
 
         # 4. Load calls
-        call_rows = con.execute(
-            "SELECT source_path, callee, qualified_callee, line, confidence, source_symbol_id "
-            "FROM calls"
-        ).fetchall()
+        if dirty_resolvers is not None:
+            pl = ",".join("?" for _ in dirty_resolvers)
+            call_rows = con.execute(
+                f"SELECT source_path, callee, qualified_callee, line, confidence, source_symbol_id "
+                f"FROM calls WHERE source_path IN ({pl})",
+                list(dirty_resolvers),
+            ).fetchall()
+        else:
+            call_rows = con.execute(
+                "SELECT source_path, callee, qualified_callee, line, confidence, source_symbol_id "
+                "FROM calls"
+            ).fetchall()
         calls = [
             CallRef(
                 callee=str(r["callee"]),
@@ -1877,8 +2306,8 @@ class Indexer:
         if telemetry is not None:
             telemetry.record(
                 "ranking_index_building",
-                time.perf_counter() - t_prep,
-                files_processed=len(known_files),
+                0.001,
+                files_processed=len(dirty_resolvers) if dirty_resolvers is not None else len(known_files),
                 items_processed=len(symbols) + len(imports) + len(calls),
             )
 
@@ -1995,12 +2424,22 @@ class Indexer:
 
         # 7. Load local bindings for data-flow and alias resolution
         t_sym_res = time.perf_counter()
-        binding_rows = con.execute(
-            "SELECT target_name, file_path, line, column, scope, expr_kind, source_expr, "
-            "is_conditional, base_expr, attr_name, dict_entries_json, list_entries_json, "
-            "subscript_target, subscript_key, subscript_index "
-            "FROM local_bindings"
-        ).fetchall()
+        if dirty_resolvers is not None:
+            pl = ",".join("?" for _ in dirty_resolvers)
+            binding_rows = con.execute(
+                f"SELECT target_name, file_path, line, column, scope, expr_kind, source_expr, "
+                f"is_conditional, base_expr, attr_name, dict_entries_json, list_entries_json, "
+                f"subscript_target, subscript_key, subscript_index "
+                f"FROM local_bindings WHERE file_path IN ({pl})",
+                list(dirty_resolvers),
+            ).fetchall()
+        else:
+            binding_rows = con.execute(
+                "SELECT target_name, file_path, line, column, scope, expr_kind, source_expr, "
+                "is_conditional, base_expr, attr_name, dict_entries_json, list_entries_json, "
+                "subscript_target, subscript_key, subscript_index "
+                "FROM local_bindings"
+            ).fetchall()
         bindings = [
             BindingRef(
                 target_name=str(r["target_name"]),
@@ -2050,91 +2489,11 @@ class Indexer:
             telemetry.record(
                 "symbol_resolution",
                 time.perf_counter() - t_sym_res,
-                files_processed=len(known_files),
+                files_processed=len(dirty_resolvers) if dirty_resolvers is not None else len(known_files),
                 items_processed=len(symbols) + len(bindings),
             )
             if progress_callback is not None:
-                progress_callback("symbol_resolution", len(known_files), len(known_files), telemetry)
-
-        # Determine if incremental relationship resolution can be safely applied
-        dirty_resolvers: set[str] | None = None
-        if dirty_files is not None:
-            changed_or_removed = set(dirty_files) | set(removed_files or ())
-            threshold = max(64, len(known_files) // 4)
-            if 0 < len(changed_or_removed) <= threshold:
-                resolvers: set[str] = set(dirty_files) & known_files
-
-                # 1. Reverse imports: find all files importing modules corresponding to changed files
-                changed_modules: set[str] = set()
-                for f in changed_or_removed:
-                    mod = normalize_module(f)
-                    if mod:
-                        changed_modules.add(mod)
-                        if "." in mod:
-                            changed_modules.add(mod.rsplit(".", 1)[0])
-
-                chunk_sz = 900
-                if changed_modules:
-                    mod_list = list(changed_modules)
-                    for ci in range(0, len(mod_list), chunk_sz):
-                        chunk = mod_list[ci : ci + chunk_sz]
-                        pl = ",".join("?" for _ in chunk)
-                        rows = con.execute(
-                            f"SELECT DISTINCT source_path FROM imports WHERE module IN ({pl}) OR imported_module IN ({pl})",
-                            chunk + chunk,
-                        ).fetchall()
-                        for r in rows:
-                            sp = str(r[0])
-                            if sp in known_files:
-                                resolvers.add(sp)
-
-                # 2. Reverse calls & tests: find callers/tests targeting symbols declared in changed files
-                cr_list = list(changed_or_removed)
-                changed_sym_names: set[str] = set()
-                changed_sym_canons: set[str] = set()
-                for ci in range(0, len(cr_list), chunk_sz):
-                    chunk = cr_list[ci : ci + chunk_sz]
-                    pl = ",".join("?" for _ in chunk)
-                    rows = con.execute(
-                        f"SELECT name, canonical_id FROM symbols WHERE path IN ({pl})",
-                        chunk,
-                    ).fetchall()
-                    for r in rows:
-                        if r[0]:
-                            changed_sym_names.add(str(r[0]))
-                        if r[1]:
-                            changed_sym_canons.add(str(r[1]))
-
-                if changed_sym_names:
-                    name_list = list(changed_sym_names)
-                    for ci in range(0, len(name_list), chunk_sz):
-                        chunk = name_list[ci : ci + chunk_sz]
-                        pl = ",".join("?" for _ in chunk)
-                        rows = con.execute(
-                            f"SELECT DISTINCT source_path FROM calls WHERE callee IN ({pl})",
-                            chunk,
-                        ).fetchall()
-                        for r in rows:
-                            sp = str(r[0])
-                            if sp in known_files:
-                                resolvers.add(sp)
-
-                if changed_sym_canons:
-                    canon_list = list(changed_sym_canons)
-                    for ci in range(0, len(canon_list), chunk_sz):
-                        chunk = canon_list[ci : ci + chunk_sz]
-                        pl = ",".join("?" for _ in chunk)
-                        rows = con.execute(
-                            f"SELECT DISTINCT file FROM graph_edges WHERE target IN ({pl})",
-                            chunk,
-                        ).fetchall()
-                        for r in rows:
-                            sp = str(r[0])
-                            if sp in known_files:
-                                resolvers.add(sp)
-
-                if len(resolvers) <= threshold:
-                    dirty_resolvers = resolvers
+                progress_callback("symbol_resolution", len(dirty_resolvers) if dirty_resolvers is not None else len(known_files), len(known_files), telemetry)
 
         t_rel_res = time.perf_counter()
         output = resolver.resolve_all(target_files=dirty_resolvers)

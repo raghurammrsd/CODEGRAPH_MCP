@@ -1472,7 +1472,12 @@ class _PythonScopeVisitor(ast.NodeVisitor):
                 self._extract_binding_from_assign(
                     target.id, node.value, node.lineno, getattr(node, "col_offset", None)
                 )
-                if target.id in ("template_name", "template") and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+                if (
+                    target.id in ("template_name", "template")
+                    and isinstance(node.value, ast.Constant)
+                    and isinstance(node.value.value, str)
+                    and node.value.value.strip()
+                ):
                     self.bindings.append(
                         BindingRef(
                             target_name=node.value.value,

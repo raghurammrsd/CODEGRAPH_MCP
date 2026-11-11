@@ -464,3 +464,44 @@ def test_trace_call_scoped_callees_no_child_expansion(tmp_path: Path) -> None:
         assert not any("nested_callee" in c for c in callee_names)
 
 
+def test_body_only_change_fast_path_and_deferred_ranking(tmp_path: Path) -> None:
+    """Modifying only the interior body of an existing function defers global ranking and resolves references in ms."""
+    repo = tmp_path / "body_only_repo"
+    repo.mkdir()
+    f1 = repo / "producer.py"
+    f1.write_text("def compute():\n    return 42\n", encoding="utf-8")
+    f2 = repo / "consumer.py"
+    f2.write_text("from producer import compute\ndef run():\n    return compute()\n", encoding="utf-8")
+
+    idx = Indexer(repo)
+    res1 = idx.index()
+    assert res1.get("indexed") == 2
+
+    # Verify initial ranking index was built
+    assert idx.last_telemetry is not None
+    assert "ranking_index_building" in idx.last_telemetry.phases
+
+    # Modify body of compute() only (no signature, decorators, imports, or exports changed)
+    f1.write_text("def compute():\n    val = 100\n    return val + 42\n", encoding="utf-8")
+
+    res2 = idx.index()
+    assert res2.get("indexed") == 1
+    assert res2.get("unchanged") == 1
+
+    # In body-only changes, ranking rebuild is lazily deferred
+    assert idx.last_telemetry is not None
+    phases = idx.last_telemetry.phases
+    assert "post_processing" in phases
+    assert phases["post_processing"].elapsed_seconds < 0.1
+    # Ranking rebuild should be deferred (0.0 elapsed or not executed)
+    if "ranking_index_building" in phases:
+        assert phases["ranking_index_building"].elapsed_seconds < 0.05
+
+    # Verify consumer still correctly resolves to producer.compute
+    with idx.session() as con:
+        edges = con.execute("SELECT source, target, relationship FROM graph_edges").fetchall()
+        assert any("consumer.run" in e["source"] and "producer.compute" in e["target"] for e in edges)
+
+
+
+

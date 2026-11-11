@@ -115,6 +115,19 @@ def scan_file_for_async(
     return run_all_detectors(tree, content, rel_path, module_name)
 
 
+_ASYNC_KEYWORDS = (
+    "celery",
+    "kafka",
+    "rabbitmq",
+    "redis",
+    "sqs",
+    "pika",
+    "kombu",
+    "tasks.task",
+    "shared_task",
+)
+
+
 class AsyncQueueScanner:
     """Repository-level scanner and graph reconciler for async queues."""
 
@@ -124,27 +137,136 @@ class AsyncQueueScanner:
     def scan_repository(
         self,
         con: sqlite3.Connection,
+        dirty_files: set[str] | None = None,
+        removed_files: set[str] | None = None,
     ) -> dict[str, int]:
-        """Scan all repository Python files, persist entities, and link matching queues."""
+        """Scan repository Python files, persist entities, and link matching queues.
+
+        Supports incremental updates: when dirty_files is provided, unchanged files
+        are skipped, and if no changed files contain messaging constructs, scan returns
+        in sub-millisecond time.
+        """
         ensure_async_tables(con)
 
-        producers: list[AsyncProducerRecord] = []
-        consumers: list[AsyncConsumerRecord] = []
+        # Fast incremental path
+        if dirty_files is not None:
+            changed_or_removed = set(dirty_files) | set(removed_files or ())
+            if not changed_or_removed:
+                return {"queues": 0, "producers": 0, "consumers": 0, "links": 0}
 
-        # Find all Python source files
-        for py_file in self.repository.rglob("*.py"):
-            if ".git" in py_file.parts or "__pycache__" in py_file.parts or ".codegraph" in py_file.parts:
-                continue
-            prods, cons = scan_file_for_async(py_file, self.repository)
-            producers.extend(prods)
-            consumers.extend(cons)
+            # Check if any changed file mentions async keywords or previously had async records
+            has_async_candidate = False
+            for fpath in dirty_files:
+                abs_p = self.repository / fpath
+                if abs_p.is_file():
+                    try:
+                        content_sample = abs_p.read_text(encoding="utf-8", errors="replace")
+                        content_lower = content_sample.lower()
+                        if any(kw in content_lower for kw in _ASYNC_KEYWORDS):
+                            has_async_candidate = True
+                            break
+                    except OSError:
+                        continue
 
-        # Clear existing static async tables
-        con.execute("DELETE FROM async_links WHERE evidence_class='STATIC_QUEUE_LINKED'")
-        con.execute("DELETE FROM async_consumers")
-        con.execute("DELETE FROM async_producers")
-        con.execute("DELETE FROM async_queues")
-        con.execute("DELETE FROM graph_edges WHERE relationship IN ('PRODUCES_TO_QUEUE', 'CONSUMES_FROM_QUEUE', 'STATIC_QUEUE_LINKED')")
+            if not has_async_candidate:
+                # Check if any changed/removed file previously had registered producers or consumers
+                pl = ",".join("?" for _ in changed_or_removed)
+                params = list(changed_or_removed) + list(changed_or_removed)
+                prev_rows = con.execute(
+                    f"SELECT 1 FROM async_producers WHERE file_path IN ({pl}) "
+                    f"UNION "
+                    f"SELECT 1 FROM async_consumers WHERE file_path IN ({pl}) LIMIT 1",
+                    params,
+                ).fetchone()
+                if not prev_rows:
+                    # Untouched and invariant: no queue updates needed
+                    return {"queues": 0, "producers": 0, "consumers": 0, "links": 0}
+
+            # Incremental update: purge old records for changed_or_removed files
+            pl = ",".join("?" for _ in changed_or_removed)
+            con.execute(f"DELETE FROM async_producers WHERE file_path IN ({pl})", list(changed_or_removed))
+            con.execute(f"DELETE FROM async_consumers WHERE file_path IN ({pl})", list(changed_or_removed))
+            con.execute(
+                f"DELETE FROM graph_edges WHERE file IN ({pl}) "
+                f"AND relationship IN ('PRODUCES_TO_QUEUE', 'CONSUMES_FROM_QUEUE', 'STATIC_QUEUE_LINKED')",
+                list(changed_or_removed),
+            )
+
+            # Scan only the dirty files that exist on disk
+            for fpath in dirty_files:
+                abs_p = self.repository / fpath
+                if abs_p.is_file() and abs_p.suffix == ".py":
+                    prods, cons = scan_file_for_async(abs_p, self.repository)
+                    for p in prods:
+                        con.execute(
+                            "INSERT INTO async_producers (queue_id, system, destination, caller_canonical_id, file_path, line, call_snippet, confidence) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            (p.queue_id, str(p.system), p.destination, p.caller_canonical_id, p.file_path, p.line, p.call_snippet, p.confidence),
+                        )
+                    for c in cons:
+                        con.execute(
+                            "INSERT INTO async_consumers (queue_id, system, destination, handler_canonical_id, file_path, line, handler_snippet, confidence) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            (c.queue_id, str(c.system), c.destination, c.handler_canonical_id, c.file_path, c.line, c.handler_snippet, c.confidence),
+                        )
+
+            # Re-read all existing producers and consumers from DB to re-link queues
+            prod_rows = con.execute(
+                "SELECT queue_id, system, destination, caller_canonical_id, file_path, line, call_snippet, confidence "
+                "FROM async_producers"
+            ).fetchall()
+            producers = [
+                AsyncProducerRecord(
+                    queue_id=str(r[0]),
+                    system=AsyncSystem(str(r[1])),
+                    destination=str(r[2]),
+                    caller_canonical_id=str(r[3]),
+                    file_path=str(r[4]),
+                    line=int(r[5]),
+                    call_snippet=str(r[6]),
+                    confidence=str(r[7]),
+                )
+                for r in prod_rows
+            ]
+
+            cons_rows = con.execute(
+                "SELECT queue_id, system, destination, handler_canonical_id, file_path, line, handler_snippet, confidence "
+                "FROM async_consumers"
+            ).fetchall()
+            consumers = [
+                AsyncConsumerRecord(
+                    queue_id=str(r[0]),
+                    system=AsyncSystem(str(r[1])),
+                    destination=str(r[2]),
+                    handler_canonical_id=str(r[3]),
+                    file_path=str(r[4]),
+                    line=int(r[5]),
+                    handler_snippet=str(r[6]),
+                    confidence=str(r[7]),
+                )
+                for r in cons_rows
+            ]
+
+            con.execute("DELETE FROM async_links WHERE evidence_class='STATIC_QUEUE_LINKED'")
+            con.execute("DELETE FROM async_queues")
+        else:
+            producers: list[AsyncProducerRecord] = []
+            consumers: list[AsyncConsumerRecord] = []
+
+            # Full scan of repository Python files
+            for py_file in self.repository.rglob("*.py"):
+                if ".git" in py_file.parts or "__pycache__" in py_file.parts or ".codegraph" in py_file.parts:
+                    continue
+                prods, cons = scan_file_for_async(py_file, self.repository)
+                producers.extend(prods)
+                consumers.extend(cons)
+
+            # Clear existing static async tables
+            con.execute("DELETE FROM async_links WHERE evidence_class='STATIC_QUEUE_LINKED'")
+            con.execute("DELETE FROM async_consumers")
+            con.execute("DELETE FROM async_producers")
+            con.execute("DELETE FROM async_queues")
+            con.execute("DELETE FROM graph_edges WHERE relationship IN ('PRODUCES_TO_QUEUE', 'CONSUMES_FROM_QUEUE', 'STATIC_QUEUE_LINKED')")
 
         # Collect distinct queues
         queues_by_id: dict[str, AsyncQueueEntity] = {}

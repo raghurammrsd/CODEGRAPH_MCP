@@ -2298,13 +2298,17 @@ class ReferenceResolver:
         # 8h. Python View -> Template Rendering (Flask, Django, FastAPI)
         for b in bindings_by_kind.get("RENDERS_TEMPLATE", ()):
             caller_id = _find_caller_id_for_binding(b)
-            raw_tmpl = b.target_name
+            raw_tmpl = (b.target_name or "").strip()
+            if not raw_tmpl or not caller_id or not caller_id.strip():
+                continue
             resolved_tmpl = raw_tmpl
             if raw_tmpl not in self.known_files:
                 for kf in self.known_files:
                     if kf.endswith(f"/{raw_tmpl}") or kf == raw_tmpl:
                         resolved_tmpl = kf
                         break
+            if not resolved_tmpl or not resolved_tmpl.strip():
+                continue
             f_hash = self.file_hashes.get(b.file_path, "")
             ev_str = f"View renders HTML template '{raw_tmpl}' at {b.file_path}:{b.line}"
             add_ref(
