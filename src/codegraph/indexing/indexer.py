@@ -1893,6 +1893,36 @@ class Indexer:
         if len(old_inh) != len(new_inh):
             return False
 
+        # 5. Compare router mounts
+        old_mounts = con.execute(
+            "SELECT parent_router, child_router, prefix FROM router_mounts WHERE file_path=? ORDER BY parent_router, child_router, prefix",
+            (path,),
+        ).fetchall()
+        new_mounts = sorted(
+            [(getattr(m, "parent_router", "") or "", getattr(m, "child_router", "") or "", getattr(m, "prefix", "") or "") for m in (getattr(result, "mounts", None) or [])],
+            key=lambda x: (x[0], x[1], x[2]),
+        )
+        if len(old_mounts) != len(new_mounts):
+            return False
+        for old_m, new_m in zip(old_mounts, new_mounts):
+            if (old_m[0] or "", old_m[1] or "", old_m[2] or "") != new_m:
+                return False
+
+        # 6. Compare router definitions
+        old_rdefs = con.execute(
+            "SELECT router_name, prefix FROM router_definitions WHERE file_path=? ORDER BY router_name, prefix",
+            (path,),
+        ).fetchall()
+        new_rdefs = sorted(
+            [(getattr(rd, "router_name", "") or "", getattr(rd, "prefix", "") or "") for rd in (getattr(result, "router_definitions", None) or [])],
+            key=lambda x: (x[0], x[1]),
+        )
+        if len(old_rdefs) != len(new_rdefs):
+            return False
+        for old_rd, new_rd in zip(old_rdefs, new_rdefs):
+            if (old_rd[0] or "", old_rd[1] or "") != new_rd:
+                return False
+
         return True
 
     def _run_body_only_resolution(
