@@ -1329,14 +1329,23 @@ def get_callees(
     callees: list[dict[str, Any]] = []
     seen: set[tuple[str, int, str]] = set()
 
-    # 1. Include verified CALLS from 'references' table
-    ref_rows = con.execute(
-        "SELECT source_symbol_id, target_symbol_id, relationship, confidence, path, start_line, end_line, evidence "
-        "FROM 'references' "
-        "WHERE (source_symbol_id=? OR source_symbol_id LIKE ?) AND relationship='CALLS' AND target_symbol_id IS NOT NULL "
-        "ORDER BY start_line ASC, target_symbol_id ASC",
-        (query_id, f"%.{clean_id}"),
-    ).fetchall()
+    # 1. Include verified CALLS from 'references' table (strictly scoped to this symbol)
+    if sym_row:
+        ref_rows = con.execute(
+            "SELECT source_symbol_id, target_symbol_id, relationship, confidence, path, start_line, end_line, evidence "
+            "FROM 'references' "
+            "WHERE source_symbol_id=? AND relationship='CALLS' AND target_symbol_id IS NOT NULL "
+            "ORDER BY start_line ASC, target_symbol_id ASC",
+            (query_id,),
+        ).fetchall()
+    else:
+        ref_rows = con.execute(
+            "SELECT source_symbol_id, target_symbol_id, relationship, confidence, path, start_line, end_line, evidence "
+            "FROM 'references' "
+            "WHERE (source_symbol_id=? OR source_symbol_id LIKE ?) AND relationship='CALLS' AND target_symbol_id IS NOT NULL "
+            "ORDER BY start_line ASC, target_symbol_id ASC",
+            (query_id, f"%.{clean_id}"),
+        ).fetchall()
 
     for r in ref_rows:
         target_cid = str(r["target_symbol_id"])
@@ -1376,9 +1385,11 @@ def get_callees(
             "s.canonical_id AS callee_canon, s.path AS callee_path "
             "FROM calls c "
             "LEFT JOIN symbols s ON (s.canonical_id = c.resolved_symbol_id OR s.qualified_name = c.qualified_callee) "
-            "WHERE (c.source_symbol_id=? OR (c.source_path=? AND c.line >= ? AND c.line <= ?)) "
+            "WHERE (c.source_symbol_id=? OR (c.source_symbol_id IS NULL AND c.source_path=? AND c.line >= ? AND c.line <= ? AND NOT EXISTS ("
+            "    SELECT 1 FROM symbols sub WHERE sub.path = c.source_path AND sub.id != ? AND c.line >= sub.start_line AND c.line <= sub.end_line"
+            "))) "
             "ORDER BY c.line ASC",
-            (query_id, query_path, sym_row["start_line"], sym_row["end_line"]),
+            (query_id, query_path, sym_row["start_line"], sym_row["end_line"], sym_row["id"]),
         ).fetchall()
     else:
         rows = con.execute(

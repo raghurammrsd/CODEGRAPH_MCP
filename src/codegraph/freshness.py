@@ -201,6 +201,8 @@ def check_freshness(
     repository: Path, con: sqlite3.Connection
 ) -> FreshnessReport:
     """Compare index state against current filesystem state."""
+    if con.row_factory is None:
+        con.row_factory = sqlite3.Row
     _ensure_meta_table(con)
 
     idx_commit = indexed_commit(con)

@@ -606,8 +606,14 @@ class ReferenceResolver:
 
         return None, "UNKNOWN", f"No matching local or imported symbol found ({reason if canon_id is None else ''})."
 
-    def resolve_all(self) -> ResolutionOutput:
-        """Run the full resolution pipeline and emit deduplicated References and GraphEdges."""
+    def resolve_all(self, target_files: set[str] | None = None) -> ResolutionOutput:
+        """Run the full resolution pipeline and emit deduplicated References and GraphEdges.
+
+        Args:
+            target_files: Optional set of dirty resolver files. If specified, only
+                references and edges owned by files in this set will be produced,
+                enabling fast incremental delta resolution while reusing global symbol indexes.
+        """
         references: list[Reference] = []
         edges: list[GraphEdge] = []
         seen_refs: set[tuple[str, str | None, str, str, int]] = set()
@@ -616,6 +622,8 @@ class ReferenceResolver:
         resolved_calls: dict[tuple[str, int, str], tuple[str | None, str]] = {}
 
         def add_ref(ref: Reference) -> None:
+            if target_files is not None and ref.path not in target_files:
+                return
             key = (
                 ref.source_symbol_id,
                 ref.target_symbol_id,
@@ -644,6 +652,8 @@ class ReferenceResolver:
             fpath = str(edge.file or "")
             if fpath.endswith(_NON_CODE_EXTS):
                 return
+            if target_files is not None and fpath not in target_files:
+                return
             key = (
                 edge.source,
                 edge.target,
@@ -664,6 +674,8 @@ class ReferenceResolver:
 
         # 0. Definition & Containment edges
         for sym in self.symbols:
+            if target_files is not None and sym.path not in target_files:
+                continue
             if sym.path.endswith(_NON_CODE_EXTS):
                 continue
             f_hash = self.file_hashes.get(sym.path, "")
@@ -697,6 +709,8 @@ class ReferenceResolver:
 
         # 1. Resolve Imports & Re-exports
         for imp in self.imports:
+            if target_files is not None and imp.source_file not in target_files:
+                continue
             src_mod = imp.source_module or normalize_module(imp.source_file)
             f_hash = self.file_hashes.get(imp.source_file, "")
             target_path, target_mod = self._resolve_import_target_module(imp)
@@ -795,6 +809,8 @@ class ReferenceResolver:
                 class_bases_map.setdefault(inh.source_canonical_id, []).append(
                     target_sym.canonical_id
                 )
+            if target_files is not None and inh.source_file not in target_files:
+                continue
             add_ref(
                 Reference(
                     source_symbol_id=inh.source_canonical_id,
@@ -1016,6 +1032,8 @@ class ReferenceResolver:
             return None, None, ""
 
         for call in self.calls:
+            if target_files is not None and call.source_file not in target_files:
+                continue
             f_hash = self.file_hashes.get(call.source_file, "")
             caller_id = call.caller_canonical_id or (self.file_to_module.get(call.source_file) or normalize_module(call.source_file))
             caller_sym_for_qname = self.canonical_to_symbol.get(caller_id)
@@ -1287,6 +1305,8 @@ class ReferenceResolver:
 
         # 4. Framework Route -> Handler edges
         for rt in self.routes:
+            if target_files is not None and rt.file_path not in target_files:
+                continue
             f_hash = self.file_hashes.get(rt.file_path, "")
             handler_sym, conf, _reason = self.resolve_identifier_in_file(
                 rt.handler_name, rt.file_path, use_line=rt.line
@@ -1323,6 +1343,8 @@ class ReferenceResolver:
 
         # 5. Verified Router Mount edges (MOUNTS)
         for me in self.mount_edges:
+            if target_files is not None and me.file_path not in target_files:
+                continue
             f_hash = self.file_hashes.get(me.file_path, "")
             add_ref(
                 Reference(
@@ -3142,6 +3164,8 @@ class ReferenceResolver:
         # 10a. Direct Test Calls (TESTS)
         # Any call originating from a test file to a production symbol
         for call in self.calls:
+            if target_files is not None and call.source_file not in target_files:
+                continue
             if not _TEST_FILE_RE.search(call.source_file):
                 continue
             t_caller_id: str = call.caller_canonical_id or (self.file_to_module.get(call.source_file) or normalize_module(call.source_file))

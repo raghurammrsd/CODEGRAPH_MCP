@@ -344,6 +344,8 @@ def detect_target_ambiguity(
         return TaskAmbiguity(status=AmbiguityStatus.CLEAR, target=target)
 
     clean_target = target.strip()
+    if con.row_factory is None:
+        con.row_factory = sqlite3.Row
 
     # Check for direct specification conflict
     if exclusions and clean_target in exclusions:

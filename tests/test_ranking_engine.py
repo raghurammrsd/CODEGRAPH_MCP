@@ -68,3 +68,15 @@ def test_normalized_score():
     res = rank_candidates(candidates, "foo", recent_paths={"a.py"})
     assert 0.0 <= res[0].score <= 1.0
 
+
+def test_production_prioritized_over_test_fixture():
+    candidates = [
+        {"file": "tests/test_service.py", "symbol": "create_user", "start_line": 10, "score": 0.5, "confidence": "HIGH"},
+        {"file": "src/services/user.py", "symbol": "create_user", "start_line": 40, "score": 0.5, "confidence": "HIGH"},
+    ]
+    res = rank_candidates(candidates, "create_user", intent="explain")
+    assert res[0].file == "src/services/user.py"
+    assert res[1].file == "tests/test_service.py"
+    assert any(r.code == "TEST_DISCOUNT" for r in res[1].reasons)
+
+

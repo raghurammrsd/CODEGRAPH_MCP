@@ -484,7 +484,7 @@ def create_server(
                 mode=effective_mode,
                 explain=explain,
             )
-            return packet.as_dict()
+            return packet.to_wire_dict(compact=not explain, explain=explain, max_tokens=effective_budget)
 
     def get_recent_changes(
         since: str = "HEAD~10",

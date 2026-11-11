@@ -388,6 +388,8 @@ def find_callees(
     max_results = min(max_results, gov.policy.max_graph_nodes_per_query)
     gen = index_generation(con)
     cache = get_graph_cache()
+    if con.row_factory is None:
+        con.row_factory = sqlite3.Row
     cache_key = (gen, "callees", symbol, max_results)
     cached = cache.get(cache_key)
     if cached is not None and isinstance(cached, list):
@@ -497,10 +499,13 @@ def find_callees(
             (clean_sym, f"%.{clean_sym}"),
         ).fetchone()
         if chunk:
+            sym_id = clean_sym
             call_rows = con.execute(
-                "SELECT callee, qualified_callee, resolved_symbol_id, line, confidence FROM calls "
-                "WHERE source_path=? AND line >= ? AND line <= ? LIMIT ?",
-                (chunk["path"], chunk["start_line"], chunk["end_line"], max_results),
+                "SELECT c.callee, c.qualified_callee, c.resolved_symbol_id, c.line, c.confidence FROM calls c "
+                "WHERE (c.source_symbol_id=? OR (c.source_symbol_id IS NULL AND c.source_path=? AND c.line >= ? AND c.line <= ? AND NOT EXISTS ("
+                "    SELECT 1 FROM symbols sub WHERE sub.path = c.source_path AND sub.id != ? AND c.line >= sub.start_line AND c.line <= sub.end_line"
+                "))) LIMIT ?",
+                (sym_id, chunk["path"], chunk["start_line"], chunk["end_line"], sym_id, max_results),
             ).fetchall()
             for cr in call_rows:
                 conf = cr["confidence"] or "LOW"

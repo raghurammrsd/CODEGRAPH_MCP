@@ -212,7 +212,152 @@ class ContextPacket(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
 
-    def as_dict(self) -> dict[str, object]:
+    def to_wire_dict(
+        self,
+        compact: bool = True,
+        explain: bool = False,
+        max_tokens: int = 1000,
+    ) -> dict[str, object]:
+        """Serialize ContextPacket into a token-bounded wire dictionary.
+
+        When compact=True and explain=False (default for MCP/CLI), internal
+        telemetry (budget rejections, execution profiles, architecture maps, and verbose
+        per-symbol ranking reasons) are omitted to deliver a clean <=1000-1500 token
+        payload. When explain=True, the complete diagnostic dictionary is returned.
+        """
+        import json
+
+        if explain or not compact:
+            return self.model_dump()
+
+        summary = ""
+        if self.selection_rationale:
+            summary = str(self.selection_rationale.get("summary") or "")
+
+        wire: dict[str, object] = {
+            "schema_version": self.schema_version,
+            "task": self.task,
+            "intent": self.intent or "UNDERSTAND",
+            "freshness": self.freshness,
+            "candidate_token_estimate": self.candidate_token_estimate,
+            "selected_token_estimate": self.selected_token_estimate,
+            "context_reduction_pct": self.context_reduction_pct,
+            "selected_tokens": self.selected_tokens,
+            "candidate_tokens": self.candidate_tokens,
+            "selected_files": self.selected_files,
+            "selected_lines": self.selected_lines,
+            "coverage_score": self.coverage_score,
+            "truncated": self.truncated,
+            "metadata": self.metadata or {
+                "selected_tokens": self.selected_tokens,
+                "candidate_tokens": self.candidate_tokens,
+                "selected_files": self.selected_files,
+                "selected_lines": self.selected_lines,
+                "coverage_score": self.coverage_score,
+                "truncated": self.truncated,
+            },
+            "budget": {
+                "selected_tokens": self.selected_tokens,
+                "candidate_tokens": self.candidate_tokens,
+                "selected_files": self.selected_files,
+                "selected_lines": self.selected_lines,
+                "coverage_score": self.coverage_score,
+                "truncated": self.truncated,
+            },
+        }
+        if summary:
+            wire["summary"] = summary
+
+        if self.symbols:
+            wire["symbols"] = [
+                {
+                    "symbol": s.symbol,
+                    "location": f"{s.file}:{s.start_line}" if s.start_line else s.file,
+                    "kind": s.kind,
+                }
+                for s in self.symbols[:15]
+            ]
+
+        if self.files:
+            wire["files"] = [
+                {
+                    "file": f.file,
+                    "score": f.score,
+                }
+                for f in self.files[:10]
+            ]
+
+        if self.evidence:
+            wire["evidence"] = [
+                {
+                    "id": f"ev_{i+1}",
+                    "location": f"{ev.file}:{ev.start_line}-{ev.end_line}",
+                    "symbol": ev.symbol or "",
+                    "snippet": ev.snippet.strip(),
+                }
+                for i, ev in enumerate(self.evidence[:6])
+            ]
+
+        if self.relationships:
+            wire["relationships"] = [
+                [r.source, r.relationship, r.target, r.confidence]
+                for r in self.relationships[:12]
+            ]
+
+        if self.routes:
+            wire["routes"] = [
+                [
+                    rt.get("method") or rt.get("http_method") or "ROUTE",
+                    rt.get("path") or rt.get("route_path") or "",
+                    rt.get("handler") or rt.get("handler_name") or "",
+                ]
+                for rt in self.routes[:8]
+            ]
+
+        if self.tests:
+            wire["statically_linked_tests"] = [
+                [t.symbol or "", t.file]
+                for t in self.tests[:8]
+            ]
+
+        if self.selection_rationale and self.selection_rationale.get("child_tools"):
+            wire["child_tools"] = self.selection_rationale["child_tools"][:20]
+
+        if self.uncertainties:
+            wire["uncertainties"] = self.uncertainties[:5]
+
+        def _calc_tokens(d: dict[str, object]) -> int:
+            try:
+                import tiktoken
+                enc = tiktoken.get_encoding("o200k_base")
+                return len(enc.encode(json.dumps(d, ensure_ascii=False, separators=(',', ':'))))
+            except Exception:
+                return len(json.dumps(d, ensure_ascii=False, separators=(',', ':'))) // 4
+
+        while _calc_tokens(wire) > max_tokens and wire.get("evidence") and len(wire["evidence"]) > 1:
+            wire["evidence"].pop()
+
+        if _calc_tokens(wire) > max_tokens and wire.get("evidence"):
+            for ev_item in wire["evidence"]:
+                snip = ev_item.get("snippet", "")
+                if len(snip) > 250:
+                    ev_item["snippet"] = snip[:250] + " ... [trimmed]"
+                    if _calc_tokens(wire) <= max_tokens:
+                        break
+
+        if _calc_tokens(wire) > max_tokens and wire.get("relationships") and len(wire["relationships"]) > 5:
+            wire["relationships"] = wire["relationships"][:5]
+
+        return wire
+
+    def as_dict(
+        self,
+        compact: bool = False,
+        explain: bool = False,
+        max_tokens: int = 1000,
+    ) -> dict[str, object]:
+        if compact:
+            return self.to_wire_dict(compact=True, explain=explain, max_tokens=max_tokens)
         return self.model_dump()
 
     def to_dict(self) -> dict[str, object]:
@@ -268,6 +413,25 @@ class ContextPacket(BaseModel):
                 path = rt.get("path") or rt.get("route_path") or ""
                 handler = rt.get("handler") or rt.get("handler_name") or ""
                 lines.append(f"- `{method} {path}` -> `{handler}`")
+            lines.append("")
+
+        if self.selection_rationale and self.selection_rationale.get("child_tools"):
+            lines.append("## Registered Nested Tools")
+            tools = self.selection_rationale["child_tools"]
+            lines.append(f"> Defined tools ({len(tools)}): `{', '.join(tools[:12])}`")
+            lines.append("> *Use `codegraph context <tool_name>` to inspect an individual tool handler.*")
+            lines.append("")
+
+        if self.tests:
+            lines.append("## Statically Linked Tests")
+            for t in self.tests[:5]:
+                lines.append(f"- `{t.symbol or t.file}` ({t.file})")
+            lines.append("")
+
+        if self.uncertainties:
+            lines.append("## Uncertainties & Static Inferences")
+            for u in self.uncertainties[:5]:
+                lines.append(f"- {u}")
             lines.append("")
 
         return "\n".join(lines).strip()
@@ -436,6 +600,8 @@ def _get_context_impl(
     max_depth: int | None = None,
     max_package_depth: int | None = None,
 ) -> ContextPacket:
+    if con.row_factory is None:
+        con.row_factory = sqlite3.Row
     if governor is None:
         governor = get_global_governor()
     req_id = create_request_id()
@@ -1150,9 +1316,31 @@ def _get_context_impl(
 
         active_seeds = filtered_seeds + deprioritized_seeds
         findings_out: list[dict[str, object]] = []
+        factory_summaries: list[str] = []
+        factory_child_tools: list[str] = []
+        giant_factory_prefixes: set[str] = set()
 
         for sym in active_seeds[:graph_seed_policy.max_seeds]:
             short = sym.split(".")[-1]
+            # Giant-Symbol Guard: Check if sym defines >=10 nested child symbols
+            child_rows = []
+            try:
+                child_rows = con.execute(
+                    "SELECT name, canonical_id FROM symbols WHERE parent_symbol_id = ? OR canonical_id LIKE ? ORDER BY start_line ASC",
+                    (sym, f"{sym}.%"),
+                ).fetchall()
+            except Exception:
+                pass
+
+            if len(child_rows) >= 10:
+                giant_factory_prefixes.add(sym)
+                giant_factory_prefixes.add(short)
+                tool_names = [str(r["name"]) for r in child_rows if r["name"] and not str(r["name"]).startswith("_")]
+                factory_child_tools.extend(tool_names)
+                factory_summaries.append(
+                    f"Target '{short}' is a factory defining {len(tool_names)} nested tools ({', '.join(tool_names[:8])}...). Showing factory setup and direct construction calls; query specific child symbols (e.g. get_context('find_symbol')) to inspect individual tool implementations."
+                )
+
             if _retrieval_policy.include_callers and (
                 retrieval_plan.entry_point_strategy in ("TRACE_FROM_ENDPOINT", "TRACE_HIERARCHY")
                 or task_spec.intent in ("DEBUG", "TRACE", "IMPACT", "CHANGE", "REVIEW", "UNDERSTAND")
@@ -1297,7 +1485,13 @@ def _get_context_impl(
                         })
                     if not _retrieval_policy.allows(s_rel):
                         continue
+                    # Exclude structural containment links from recursive graph expansion
+                    if s_rel in ("CONTAINS", "REEXPORTS"):
+                        continue
                     other_id = str(srow["target"]) if str(srow["source"]).endswith(short) or str(srow["source"]) == sym else str(srow["source"])
+                    # If other_id belongs to a giant factory, do not expand it
+                    if any(other_id.startswith(f"{gfp}.") for gfp in giant_factory_prefixes):
+                        continue
                     target_symbols.add(other_id)
                     sym_lookup = con.execute(
                         "SELECT canonical_id, qualified_name, name, path, start_line, end_line FROM symbols "
@@ -1472,6 +1666,25 @@ def _get_context_impl(
 
         candidate_dicts = filtered_candidate_dicts
 
+        # Giant-Symbol Guard: Filter out nested child functions of giant factory unless explicitly named in task
+        if giant_factory_prefixes:
+            task_clean_lower = task_display_str.lower()
+            filtered_cands = []
+            for cd in candidate_dicts:
+                c_canon = str(cd.get("canonical_id") or "")
+                c_sym = str(cd.get("symbol") or "")
+                is_nested_child = any(
+                    c_canon.startswith(f"{gfp}.") or (c_sym.startswith(f"{gfp}.") and c_sym != gfp)
+                    for gfp in giant_factory_prefixes
+                )
+                if is_nested_child:
+                    child_short = c_sym.split(".")[-1].lower()
+                    if child_short in task_clean_lower:
+                        filtered_cands.append(cd)
+                else:
+                    filtered_cands.append(cd)
+            candidate_dicts = filtered_cands
+
         # 6. Rank candidates
         t_rank_start = time.perf_counter()
         legacy_intent_str = str(caller_raw_intent or task_spec.intent.lower())
@@ -1636,17 +1849,17 @@ def _get_context_impl(
                 known_cid = it.canonical_id or it.data.get("canonical_id")
                 if known_cid:
                     row = con.execute(
-                        "SELECT canonical_id, kind FROM symbols WHERE canonical_id=? LIMIT 1",
+                        "SELECT canonical_id, kind, qualified_name, name FROM symbols WHERE canonical_id=? LIMIT 1",
                         (known_cid,),
                     ).fetchone()
                 else:
                     row = con.execute(
-                        "SELECT canonical_id, kind FROM symbols WHERE (canonical_id=? OR qualified_name=? OR name=?) AND path=? LIMIT 1",
+                        "SELECT canonical_id, kind, qualified_name, name FROM symbols WHERE (canonical_id=? OR qualified_name=? OR name=?) AND path=? LIMIT 1",
                         (sym_name, sym_name, sym_name, it.file_path),
                     ).fetchone()
                     if not row and not it.file_path:
                         row = con.execute(
-                            "SELECT canonical_id, kind FROM symbols WHERE canonical_id=? OR qualified_name=? LIMIT 1",
+                            "SELECT canonical_id, kind, qualified_name, name FROM symbols WHERE canonical_id=? OR qualified_name=? LIMIT 1",
                             (sym_name, sym_name),
                         ).fetchone()
                 cid = known_cid or (row["canonical_id"] if row and "canonical_id" in row.keys() else None)
@@ -1655,10 +1868,11 @@ def _get_context_impl(
                     continue
                 seen_canonical_syms.add(dedup_id)
                 kind = row["kind"] if row else "unknown"
+                resolved_sym = str(row["qualified_name"] or row["name"]) if row and "qualified_name" in row.keys() and (row["qualified_name"] or row["name"]) else sym_name
                 reasons = it.data.get("reasons", [])
                 symbols_out.append(
                     SymbolRef(
-                        symbol=sym_name,
+                        symbol=resolved_sym,
                         file=it.file_path,
                         kind=kind,
                         start_line=it.start_line,
@@ -1673,6 +1887,27 @@ def _get_context_impl(
                         package_id=it.package_id,
                     )
                 )
+
+        # Sort symbols: Production-first policy (exact targets > production symbols > test files)
+        from codegraph.ranking import _TEST_PATTERNS
+
+        def symbol_sort_key(s: SymbolRef) -> tuple[int, int, float, str]:
+            reason_codes = {r.code for r in s.reasons}
+            if "EXACT_CANONICAL" in reason_codes:
+                prio = 0
+            elif "EXACT_QUALIFIED" in reason_codes:
+                prio = 1
+            elif "EXACT_SYMBOL" in reason_codes:
+                prio = 2
+            elif "TARGET_EXPANSION" in reason_codes:
+                prio = 3
+            else:
+                prio = 4
+            is_test_file = bool(_TEST_PATTERNS.search(s.file)) if s.file else False
+            test_prio = 1 if is_test_file else 0
+            return (test_prio, prio, -s.score, s.symbol)
+
+        symbols_out.sort(key=symbol_sort_key)
 
         # ── Relationships extraction & compression ──────────────────────────
         relationships_raw: list[Relationship] = list(route_relationships)
@@ -2036,6 +2271,25 @@ def _get_context_impl(
         if not candidate_dicts:
             uncertainties.append("No lexical or graph matches found. Results may be incomplete.")
 
+        # Epistemic & Static Uncertainty Propagation
+        for rel in relationships_out:
+            conf_str = str(rel.confidence or "HIGH").upper()
+            rel_type = str(rel.relationship or "")
+            if conf_str in ("LOW", "UNKNOWN") or rel_type in ("POSSIBLE_CALLS", "DYNAMIC_DISPATCH", "UNRESOLVED_REFERENCE"):
+                u_msg = f"Static analysis uncertain: '{rel.source}' {rel_type} '{rel.target}' [confidence={conf_str}]"
+                if u_msg not in uncertainties:
+                    uncertainties.append(u_msg)
+
+        for f in findings_out:
+            if f.get("type") == "EPISTEMIC_EDGE":
+                u_msg = f"Static analysis uncertain: '{f.get('source')}' {f.get('relationship')} '{f.get('target')}' ({f.get('evidence_class', 'UNKNOWN')})"
+                if u_msg not in uncertainties:
+                    uncertainties.append(u_msg)
+            elif f.get("type") == "DYNAMIC_DISPATCH":
+                u_msg = f"Dynamic dispatch at {f.get('file')}:{f.get('line')} cannot be verified statically."
+                if u_msg not in uncertainties:
+                    uncertainties.append(u_msg)
+
         timing.serialization_ms = (time.perf_counter() - t_serial_start) * 1000
         timing.total_ms = timer.elapsed_ms
 
@@ -2162,8 +2416,14 @@ def _get_context_impl(
                 "routes": route_hops,
             },
             "budget_reduction": f"{round(budget.reduction_ratio * 100, 1)}% tokens saved ({budget.candidate_tokens} candidate -> {budget.selected_tokens} selected)",
-            "summary": f"Context assembled for '{task_spec.intent}' intent: {len(symbols_out)} key symbols, {len(relationships_out)} relationships, and {len(evidence_out)} evidence snippets across {len(selected_paths)} files.",
+            "summary": (
+                factory_summaries[0]
+                if factory_summaries
+                else f"Context assembled for '{task_spec.intent}' intent: {len(symbols_out)} key symbols, {len(relationships_out)} relationships, and {len(evidence_out)} evidence snippets across {len(selected_paths)} files."
+            ),
         }
+        if factory_child_tools:
+            selection_rationale_dict["child_tools"] = factory_child_tools[:30]
 
         packet = ContextPacket(
             schema_version=SCHEMA_VERSION,

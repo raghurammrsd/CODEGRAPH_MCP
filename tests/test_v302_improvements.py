@@ -192,3 +192,199 @@ def test_codegraph_review_cli_command(tmp_path: Path) -> None:
     data = json.loads(res_json.stdout)
     assert data["changed_files_count"] == 1
     assert "blast_radius_score" in data
+
+
+def test_delta_relationship_resolution_on_small_change(tmp_path: Path) -> None:
+    """Incremental indexing recalculates only affected callers and dirty resolvers, preserving untouched edges."""
+    repo = tmp_path / "delta_repo"
+    repo.mkdir()
+
+    p1 = repo / "producer.py"
+    p1.write_text("def compute(x: int) -> int:\n    return x * 2\n", encoding="utf-8")
+
+    c1 = repo / "consumer.py"
+    c1.write_text("from producer import compute\ndef process():\n    return compute(10)\n", encoding="utf-8")
+
+    u1 = repo / "unrelated.py"
+    u1.write_text("def unrelated():\n    return 42\n", encoding="utf-8")
+
+    idx = Indexer(repo)
+    idx.index()
+
+    with idx.session() as con:
+        # Check initial edges
+        edges_init = con.execute("SELECT source, target, relationship, file FROM graph_edges").fetchall()
+        assert any(r["source"] == "unrelated.py" for r in edges_init)
+        assert any(r["target"] == "producer.compute" for r in edges_init)
+
+    # Modify ONLY producer.py
+    p1.write_text("def compute(x: int) -> int:\n    return (x * 2) + 1\n", encoding="utf-8")
+    res = idx.index()
+    assert res.get("indexed", 0) == 1
+    assert res.get("unchanged", 0) == 2
+
+    with idx.session() as con:
+        # Untouched file edges (unrelated.py) remain intact in graph_edges
+        edges_after = con.execute("SELECT source, target, relationship, file FROM graph_edges").fetchall()
+        assert any(r["source"] == "unrelated.py" for r in edges_after)
+        # Relationship from consumer.py to producer.compute remains resolved
+        assert any(r["target"] == "producer.compute" and r["file"] == "consumer.py" for r in edges_after)
+
+
+def test_compact_wire_serialization_and_token_cap(tmp_path: Path) -> None:
+    """ContextPacket to_wire_dict enforces compact representation and final payload token capping."""
+    repo = tmp_path / "wire_repo"
+    repo.mkdir()
+    (repo / "app.py").write_text(
+        "def entry():\n    return 1\n",
+        encoding="utf-8",
+    )
+    idx = Indexer(repo)
+    idx.index()
+
+    with idx.session() as con:
+        packet = get_context(con, repo, "how does entry work?")
+
+        # Default compact wire payload
+        wire = packet.to_wire_dict(compact=True, explain=False, max_tokens=1000)
+        assert wire["schema_version"]
+        assert wire["task"] == "how does entry work?"
+        assert wire["symbols"]
+        assert "rejections" not in wire.get("budget", {})  # Rejection bloat removed
+        assert "covered_dimensions" not in wire.get("budget", {})
+        assert "execution" not in wire  # Timing telemetry removed
+        assert "architecture" not in wire  # Architecture dump removed
+
+        # Canonical token count must be <= 1000
+        serialized = json.dumps(wire, separators=(",", ":"))
+        est_tokens = len(serialized) // 4
+        assert est_tokens <= 1000
+
+        # When explain=True, full diagnostics are preserved
+        full = packet.to_wire_dict(compact=True, explain=True)
+        assert "budget" in full
+        assert "execution" in full
+
+        # Default as_dict() maintains compatibility with existing tests
+        legacy = packet.as_dict()
+        assert "schema_version" in legacy
+        assert "candidate_token_estimate" in legacy
+
+
+def test_factory_nested_callees_are_strictly_scoped(tmp_path: Path) -> None:
+    """Outer factory functions do not swallow call sites from nested inner functions."""
+    from codegraph.graph.traversal import find_callees
+    from codegraph.interrogation import get_callees
+
+    repo = tmp_path / "factory_repo"
+    repo.mkdir()
+    (repo / "factory.py").write_text(
+        "def helper_outer():\n"
+        "    return 'outer'\n\n"
+        "def helper_inner():\n"
+        "    return 'inner'\n\n"
+        "def make_engine():\n"
+        "    helper_outer()\n"
+        "    def run_worker():\n"
+        "        helper_inner()\n"
+        "        helper_inner()\n"
+        "    return run_worker\n",
+        encoding="utf-8",
+    )
+    idx = Indexer(repo)
+    idx.index()
+
+    with idx.session() as con:
+        # Check callees of outer factory: only helper_outer must be called directly
+        outer_res = get_callees(con, repo, symbol="make_engine")
+        outer_callees = [c["callee"] for c in outer_res.get("callees", [])]
+        assert "helper_outer" in outer_callees
+        assert "helper_inner" not in outer_callees
+
+        # Check callees via find_callees
+        trav_callees = find_callees(con, "make_engine")
+        trav_names = [c.callee for c in trav_callees]
+        assert "helper_outer" in trav_names
+        assert "helper_inner" not in trav_names
+
+        # Check nested inner function: owns its own calls
+        inner_res = get_callees(con, repo, symbol="run_worker")
+        inner_callees = [c["callee"] for c in inner_res.get("callees", [])]
+        assert "helper_inner" in inner_callees
+        assert "helper_outer" not in inner_callees
+
+
+def test_giant_symbol_guard_and_uncertainty_propagation(tmp_path: Path) -> None:
+    """Giant container functions with >10 child symbols trigger giant-symbol guard and summarize child tools."""
+    repo = tmp_path / "giant_repo"
+    repo.mkdir()
+
+    # Generate a factory defining 12 child functions
+    tool_defs = "\n".join(
+        f"    def tool_{i}():\n        return {i}\n"
+        for i in range(12)
+    )
+    (repo / "server.py").write_text(
+        "def init_config():\n    return {}\n\n"
+        "def create_app():\n"
+        "    init_config()\n"
+        f"{tool_defs}"
+        "    return True\n",
+        encoding="utf-8",
+    )
+
+    idx = Indexer(repo)
+    idx.index()
+
+    with idx.session() as con:
+        pkt = get_context(con, repo, "how does create_app work?")
+        wire = pkt.to_wire_dict(compact=True, explain=False, max_tokens=1000)
+
+        # Giant-Symbol Guard activated
+        assert "factory defining 12 nested tools" in wire.get("summary", "")
+        assert "child_tools" in wire
+        assert len(wire["child_tools"]) >= 10
+        assert "tool_0" in wire["child_tools"]
+
+        # create_app ranks #1 production symbol, not overwhelmed by 12 child tools
+        assert "create_app" in wire["symbols"][0]["symbol"]
+
+        # Epistemic uncertainties are present if stale or unverified
+        assert isinstance(wire.get("uncertainties", []), list)
+
+
+def test_production_first_ranking_policy(tmp_path: Path) -> None:
+    """Non-test queries rank production code before test fixtures and discount test files."""
+    repo = tmp_path / "prod_test_repo"
+    repo.mkdir()
+    (repo / "user_service.py").write_text(
+        "def create_user(name: str):\n    return {'name': name}\n",
+        encoding="utf-8",
+    )
+    tests_dir = repo / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_user.py").write_text(
+        "from user_service import create_user\n"
+        "def test_create_user():\n"
+        "    u = create_user('alice')\n"
+        "    assert u['name'] == 'alice'\n",
+        encoding="utf-8",
+    )
+
+    idx = Indexer(repo)
+    idx.index()
+
+    with idx.session() as con:
+        pkt = get_context(con, repo, "create_user")
+        wire = pkt.to_wire_dict(compact=True, explain=False, max_tokens=1000)
+
+        # Production symbol is #1
+        top_sym = wire["symbols"][0]
+        assert top_sym["symbol"] == "create_user"
+        assert "user_service.py" in top_sym["location"]
+
+        # Tests appear under statically_linked_tests, not crowding out production symbols
+        if "statically_linked_tests" in wire:
+            test_files = [t[1] for t in wire["statically_linked_tests"]]
+            assert any("test_user.py" in tf for tf in test_files)
+

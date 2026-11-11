@@ -142,12 +142,12 @@ def rank_candidates(
     relationship_distance = relationship_distance or {}
 
     # Extract terms: dotted terms and word terms
-    dotted_terms = {t.lower() for t in re.findall(r"[A-Za-z_][\w.]*\.[\w.]+", query)}
-    word_terms = {t.lower() for t in re.findall(r"[A-Za-z_][\w]*", query) if len(t) > 1}
-    for ts in target_symbols:
-        word_terms.add(ts.lower().split(".")[-1])
-        if "." in ts:
-            dotted_terms.add(ts.lower())
+    # Extract terms: query terms vs expanded target symbols
+    query_dotted_terms = {t.lower() for t in re.findall(r"[A-Za-z_][\w.]*\.[\w.]+", query)}
+    query_word_terms = {t.lower() for t in re.findall(r"[A-Za-z_][\w]*", query) if len(t) > 1}
+    target_symbols_lower = {ts.lower() for ts in target_symbols}
+    target_words = {ts.lower().split(".")[-1] for ts in target_symbols if ts}
+    all_word_terms = query_word_terms | target_words
 
     scored_items: list[RankedItem] = []
 
@@ -168,38 +168,39 @@ def rank_candidates(
         reasons: list[RankingReason] = []
 
         # 1. Base Symbol Matching (strictly hierarchical to avoid double counting)
-        matched_exact = False
         canon_lower = canonical_id.lower() if canonical_id else ""
         sym_lower = symbol_str.lower() if symbol_str else ""
         short_name = sym_lower.split(".")[-1] if sym_lower else ""
 
-        # Exact canonical match
-        if canon_lower and any(dt == canon_lower or dt in canon_lower for dt in dotted_terms):
+        # Exact canonical match on query terms
+        if canon_lower and any(dt == canon_lower or canon_lower.endswith(f".{dt}") for dt in query_dotted_terms):
             val = weights.target_bonus + 0.20
             score += val
             reasons.append(RankingReason("EXACT_CANONICAL", "Exact canonical symbol match", round(val, 3)))
-            matched_exact = True
-        # Exact qualified name match
-        elif sym_lower and any(dt == sym_lower or sym_lower.endswith(f".{dt}") for dt in dotted_terms):
+        # Exact qualified name match on query terms
+        elif sym_lower and any(dt == sym_lower or sym_lower.endswith(f".{dt}") for dt in query_dotted_terms):
             val = weights.target_bonus + 0.15
             score += val
             reasons.append(RankingReason("EXACT_QUALIFIED", "Exact qualified symbol match", round(val, 3)))
-            matched_exact = True
-        # Exact symbol name match
-        elif short_name and short_name in word_terms:
+        # Exact symbol name match on query terms
+        elif short_name and short_name in query_word_terms:
             val = weights.target_bonus + 0.10
             score += val
             reasons.append(RankingReason("EXACT_SYMBOL", "Exact target symbol", round(val, 3)))
-            matched_exact = True
+        # Expanded target symbol match (from graph traversal seeds/targets)
+        elif (canon_lower and (canon_lower in target_symbols_lower or any(canon_lower.endswith(f".{ts}") for ts in target_symbols_lower if "." in ts))) or (sym_lower and sym_lower in target_symbols_lower):
+            val = weights.target_bonus + 0.05
+            score += val
+            reasons.append(RankingReason("TARGET_EXPANSION", "Expanded target symbol", round(val, 3)))
         # Name relevance
-        elif (short_name and any(wt in short_name for wt in word_terms)) or (
-            sym_lower and any(wt in sym_lower for wt in word_terms)
+        elif (short_name and any(wt in short_name for wt in all_word_terms)) or (
+            sym_lower and any(wt in sym_lower for wt in all_word_terms)
         ):
             val = min(0.25, max(0.12, base_search_score))
             score += val
             reasons.append(RankingReason("NAME_MATCH", "Symbol name relevance", round(val, 3)))
         # Path relevance
-        elif any(wt in file_.lower() for wt in word_terms):
+        elif any(wt in file_.lower() for wt in all_word_terms):
             val = min(0.20, max(0.10, base_search_score))
             score += val
             reasons.append(RankingReason("PATH_MATCH", "File path relevance", round(val, 3)))
@@ -293,12 +294,22 @@ def rank_candidates(
             score -= 0.10
             reasons.append(RankingReason("PARTIALLY_STALE", "Partially stale evidence", -0.10))
 
-        # 5. Test Relationship
+        # 5. Test Relationship vs Production Prioritization
         is_test = bool(_TEST_PATTERNS.search(file_))
-        if is_test and (relationship.startswith("TEST") or matched_exact):
-            val = weights.test_bonus
-            score += val
-            reasons.append(RankingReason("TEST_RELATION", "Related test file", val))
+        if is_test:
+            if intent_key in ("test", "testing", "test_discovery", "find_tests"):
+                val = weights.test_bonus
+                score += val
+                reasons.append(RankingReason("TEST_RELATION", "Related test file", val))
+            elif relationship.startswith("TEST"):
+                val = round(weights.test_bonus * 0.5, 3)
+                score += val
+                reasons.append(RankingReason("TEST_RELATION", "Statically linked test", val))
+            else:
+                # Production code prioritized over test fixtures/mocks for non-test queries
+                discount = 0.25
+                score -= discount
+                reasons.append(RankingReason("TEST_DISCOUNT", "Test file discounted for non-test query", -discount))
 
         # 6. Entry Point & Framework Route
         is_entry = bool(_ENTRY_PATTERNS.search(file_))
@@ -366,7 +377,10 @@ def rank_candidates(
                 penalty += 0.20
             seen_symbols.add(sym_key)
         if item.file in seen_files:
-            penalty += 0.10
+            # Exempt exact focal targets from duplicate file penalty
+            is_exact_focal = any(r.code in ("EXACT_CANONICAL", "EXACT_QUALIFIED", "EXACT_SYMBOL") for r in item.reasons)
+            if not is_exact_focal:
+                penalty += 0.10
         seen_files.add(item.file)
 
         if penalty > 0:

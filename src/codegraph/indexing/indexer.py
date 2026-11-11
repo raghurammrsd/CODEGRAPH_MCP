@@ -46,6 +46,7 @@ from .models import (
     ImportRef,
     InheritanceRef,
     Symbol,
+    normalize_module,
 )
 from .parser import PARSER_VERSION, parse
 from .pool import SQLiteConnectionPool
@@ -2055,13 +2056,95 @@ class Indexer:
             if progress_callback is not None:
                 progress_callback("symbol_resolution", len(known_files), len(known_files), telemetry)
 
+        # Determine if incremental relationship resolution can be safely applied
+        dirty_resolvers: set[str] | None = None
+        if dirty_files is not None:
+            changed_or_removed = set(dirty_files) | set(removed_files or ())
+            threshold = max(64, len(known_files) // 4)
+            if 0 < len(changed_or_removed) <= threshold:
+                resolvers: set[str] = set(dirty_files) & known_files
+
+                # 1. Reverse imports: find all files importing modules corresponding to changed files
+                changed_modules: set[str] = set()
+                for f in changed_or_removed:
+                    mod = normalize_module(f)
+                    if mod:
+                        changed_modules.add(mod)
+                        if "." in mod:
+                            changed_modules.add(mod.rsplit(".", 1)[0])
+
+                chunk_sz = 900
+                if changed_modules:
+                    mod_list = list(changed_modules)
+                    for ci in range(0, len(mod_list), chunk_sz):
+                        chunk = mod_list[ci : ci + chunk_sz]
+                        pl = ",".join("?" for _ in chunk)
+                        rows = con.execute(
+                            f"SELECT DISTINCT source_path FROM imports WHERE module IN ({pl}) OR imported_module IN ({pl})",
+                            chunk + chunk,
+                        ).fetchall()
+                        for r in rows:
+                            sp = str(r[0])
+                            if sp in known_files:
+                                resolvers.add(sp)
+
+                # 2. Reverse calls & tests: find callers/tests targeting symbols declared in changed files
+                cr_list = list(changed_or_removed)
+                changed_sym_names: set[str] = set()
+                changed_sym_canons: set[str] = set()
+                for ci in range(0, len(cr_list), chunk_sz):
+                    chunk = cr_list[ci : ci + chunk_sz]
+                    pl = ",".join("?" for _ in chunk)
+                    rows = con.execute(
+                        f"SELECT name, canonical_id FROM symbols WHERE path IN ({pl})",
+                        chunk,
+                    ).fetchall()
+                    for r in rows:
+                        if r[0]:
+                            changed_sym_names.add(str(r[0]))
+                        if r[1]:
+                            changed_sym_canons.add(str(r[1]))
+
+                if changed_sym_names:
+                    name_list = list(changed_sym_names)
+                    for ci in range(0, len(name_list), chunk_sz):
+                        chunk = name_list[ci : ci + chunk_sz]
+                        pl = ",".join("?" for _ in chunk)
+                        rows = con.execute(
+                            f"SELECT DISTINCT source_path FROM calls WHERE callee IN ({pl})",
+                            chunk,
+                        ).fetchall()
+                        for r in rows:
+                            sp = str(r[0])
+                            if sp in known_files:
+                                resolvers.add(sp)
+
+                if changed_sym_canons:
+                    canon_list = list(changed_sym_canons)
+                    for ci in range(0, len(canon_list), chunk_sz):
+                        chunk = canon_list[ci : ci + chunk_sz]
+                        pl = ",".join("?" for _ in chunk)
+                        rows = con.execute(
+                            f"SELECT DISTINCT file FROM graph_edges WHERE target IN ({pl})",
+                            chunk,
+                        ).fetchall()
+                        for r in rows:
+                            sp = str(r[0])
+                            if sp in known_files:
+                                resolvers.add(sp)
+
+                if len(resolvers) <= threshold:
+                    dirty_resolvers = resolvers
+
         t_rel_res = time.perf_counter()
-        output = resolver.resolve_all()
+        output = resolver.resolve_all(target_files=dirty_resolvers)
         self.last_epistemic_findings = list(output.findings)
 
         # Update framework_routes handler_canonical_id if resolved via local bindings / imports
         route_updates: list[tuple[str, str]] = []
         for rt in composed_routes:
+            if dirty_resolvers is not None and rt.file_path not in dirty_resolvers:
+                continue
             handler_sym, _conf, _reason = resolver.resolve_identifier_in_file(
                 rt.handler_name, rt.file_path, use_line=rt.line
             )
@@ -2089,7 +2172,7 @@ class Indexer:
             telemetry.record(
                 "relationship_resolution",
                 time.perf_counter() - t_rel_res,
-                files_processed=len(known_files),
+                files_processed=len(dirty_resolvers) if dirty_resolvers is not None else len(known_files),
                 items_processed=len(output.references) + len(output.resolved_imports) + len(output.resolved_calls),
                 errors_skips=budget_skips,
                 db_writes=len(route_updates),
@@ -2113,6 +2196,10 @@ class Indexer:
             progress_callback("database_analysis", len(known_files), len(known_files), telemetry)
 
         t_edges = time.perf_counter()
+        if dirty_resolvers is not None:
+            # Under incremental delta resolution, untouched DB edges are already in graph_edges.
+            # Only insert newly generated/updated DB edges for files in dirty_resolvers.
+            db_edges = [e for e in db_edges if getattr(e, "file", None) in dirty_resolvers]
         all_edges: list[Any] = [*output.edges, *db_edges]
         output.edges.clear()
         db_edges.clear()
@@ -2146,7 +2233,17 @@ class Indexer:
             if telemetry is not None:
                 telemetry.observe_wal(self.db_path)
 
-        con.execute("DELETE FROM 'references'")
+        if dirty_resolvers is not None:
+            purge_files = list(dirty_resolvers | set(removed_files or ()))
+            for ci in range(0, len(purge_files), 900):
+                chunk = purge_files[ci : ci + 900]
+                pl = ",".join("?" for _ in chunk)
+                con.execute(f"DELETE FROM 'references' WHERE path IN ({pl})", chunk)
+                con.execute(f"DELETE FROM graph_edges WHERE file IN ({pl})", chunk)
+        else:
+            con.execute("DELETE FROM 'references'")
+            con.execute("DELETE FROM graph_edges")
+
         for i in range(0, total_refs, post_chunk_size):
             batch_refs = output.references[i : i + post_chunk_size]
             con.executemany(
@@ -2175,7 +2272,6 @@ class Indexer:
                 _checkpoint_post()
         output.references.clear()
 
-        con.execute("DELETE FROM graph_edges")
         for i in range(0, total_edges, post_chunk_size):
             batch_edges = all_edges[i : i + post_chunk_size]
             con.executemany(

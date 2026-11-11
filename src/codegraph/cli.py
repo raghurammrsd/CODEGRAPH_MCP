@@ -1529,7 +1529,9 @@ def context(
             explain=explain,
         )
     if json_output:
-        typer.echo(json.dumps(packet.as_dict(), indent=2))
+        wire_token_cap = max_tokens if explain else min(max_tokens, 1000)
+        wire = packet.to_wire_dict(compact=not explain, explain=explain, max_tokens=wire_token_cap)
+        typer.echo(json.dumps(wire, indent=2))
     else:
         typer.echo(packet.format_human())
 
