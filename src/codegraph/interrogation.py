@@ -2284,8 +2284,10 @@ def get_git_impact(
         from codegraph.git import is_shallow_repository
         if is_shallow_repository(repository):
             return {
-                "status": "warning",
-                "warning": "Repository is a shallow clone (e.g. cloned with --depth 1); Git history is insufficient. Run 'git fetch --unshallow' to enable full change impact analysis.",
+                "error": "SHALLOW_CLONE_INSUFFICIENT_HISTORY",
+                "status": "error",
+                "message": f"Git reference '{base}' could not be resolved because the repository is a shallow clone (e.g. cloned with --depth 1) with insufficient commit history.",
+                "resolution": "Run 'git fetch --unshallow' to enable revision comparisons, or compare against HEAD.",
                 "is_shallow": True,
                 "changed_files": 0,
                 "affected_symbols": [],

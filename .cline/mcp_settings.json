@@ -4,7 +4,9 @@
       "command": "codegraph",
       "args": [
         "mcp",
-        "serve"
+        "serve",
+        "--profile",
+        "core12"
       ],
       "disabled": false
     }

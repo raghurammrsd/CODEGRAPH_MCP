@@ -178,20 +178,26 @@ def test_core12_profile_exposes_12_opinionated_tools(polyglot_repo: Path) -> Non
     tools_12 = set(srv_12._tool_manager._tools.keys())
     expected_12 = {
         "find_symbol",
+        "find_references",
         "get_callers",
         "get_callees",
+        "trace_path",
         "find_routes",
-        "read_file_range",
-        "get_file_outline",
-        "analyze_change_impact",
         "find_db_models",
         "get_schema_impact",
-        "find_tests_for_symbol",
+        "find_tests",
+        "analyze_symbol_impact",
+        "analyze_git_impact",
         "safe_rename_symbol",
-        "get_architecture_summary",
     }
     assert tools_12 == expected_12
     assert len(tools_12) == 12
+
+    # Verify pro30 tier exposes exactly 30 tools
+    srv_30 = create_server(polyglot_repo, profile="pro30")
+    tools_30 = set(srv_30._tool_manager._tools.keys())
+    assert len(tools_30) == 30
+    assert expected_12.issubset(tools_30)
 
 
 def test_clean_tool_names_and_backward_compatible_aliases(polyglot_repo: Path) -> None:

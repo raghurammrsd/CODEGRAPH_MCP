@@ -75,7 +75,9 @@ CREATE TABLE IF NOT EXISTS files (
     status          TEXT NOT NULL DEFAULT 'ok',
     parse_error     TEXT,
     last_valid_hash TEXT,
-    category        TEXT NOT NULL DEFAULT 'SOURCE'
+    category        TEXT NOT NULL DEFAULT 'SOURCE',
+    mtime_ns        INTEGER NOT NULL DEFAULT 0,
+    size            INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS chunks (
@@ -650,6 +652,10 @@ class Indexer:
             con.execute("ALTER TABLE files ADD COLUMN last_valid_hash TEXT")
         if "category" not in files_cols:
             con.execute("ALTER TABLE files ADD COLUMN category TEXT NOT NULL DEFAULT 'SOURCE'")
+        if "mtime_ns" not in files_cols:
+            con.execute("ALTER TABLE files ADD COLUMN mtime_ns INTEGER NOT NULL DEFAULT 0")
+        if "size" not in files_cols:
+            con.execute("ALTER TABLE files ADD COLUMN size INTEGER NOT NULL DEFAULT 0")
 
         symbols_cols = existing_columns("symbols")
         for col_def in (
@@ -788,16 +794,54 @@ class Indexer:
 
                     force_reparse = (last_parser_ver != PARSER_VERSION)
 
-                    # Pre-load existing file hashes and statuses in a single query
-                    existing_files: dict[str, tuple[str, str]] = {
-                        str(r["path"]): (str(r["hash"]), str(r["status"]))
-                        for r in con.execute("SELECT path, hash, status FROM files").fetchall()
-                    }
+                    # Ensure stat cache columns exist on existing databases
+                    try:
+                        cols = {str(r["name"]) for r in con.execute("PRAGMA table_info(files)").fetchall()}
+                        if "mtime_ns" not in cols:
+                            con.execute("ALTER TABLE files ADD COLUMN mtime_ns INTEGER NOT NULL DEFAULT 0")
+                        if "size" not in cols:
+                            con.execute("ALTER TABLE files ADD COLUMN size INTEGER NOT NULL DEFAULT 0")
+                    except sqlite3.OperationalError:
+                        pass
+
+                    # Pre-load existing file hashes, statuses, and stat cache (mtime_ns, size)
+                    existing_files: dict[str, tuple[str, str, int, int]] = {}
+                    for r in con.execute("SELECT path, hash, status, mtime_ns, size FROM files").fetchall():
+                        existing_files[str(r["path"])] = (
+                            str(r["hash"]),
+                            str(r["status"]),
+                            int(r["mtime_ns"] or 0),
+                            int(r["size"] or 0),
+                        )
 
                     # Identify changed/new files needing parsing
-                    pending_files: list[tuple[Any, str, str, str, str, bool]] = []
+                    pending_files: list[tuple[Any, str, str, str, str, bool, int, int]] = []
+                    stat_updates: list[tuple[int, int, str]] = []
                     for item in files:
                         relative = item.relative_path.as_posix()
+                        old_state = existing_files.get(relative)
+
+                        # High-performance OS stat cache fast-path
+                        st_mtime_ns = 0
+                        st_size = 0
+                        try:
+                            st = item.path.stat()
+                            st_mtime_ns = st.st_mtime_ns
+                            st_size = st.st_size
+                        except OSError:
+                            pass
+
+                        if (
+                            old_state is not None
+                            and not force_reparse
+                            and old_state[1] != "parse_failed"
+                            and old_state[2] != 0
+                            and old_state[2] == st_mtime_ns
+                            and old_state[3] == st_size
+                        ):
+                            unchanged += 1
+                            continue
+
                         t_read = time.perf_counter()
                         try:
                             content = item.path.read_text(encoding="utf-8", errors="replace")
@@ -812,12 +856,13 @@ class Indexer:
                             items_processed=len(content),
                         )
 
-                        old_state = existing_files.get(relative)
                         if old_state is not None and old_state[0] == digest and not force_reparse:
                             if old_state[1] == "parse_failed":
                                 parse_failed_count += 1
                             else:
                                 unchanged += 1
+                                if old_state[2] != st_mtime_ns or old_state[3] != st_size:
+                                    stat_updates.append((st_mtime_ns, st_size, relative))
                             telemetry.phases["file_reading"].errors_skips += 1
                             continue
 
@@ -830,7 +875,14 @@ class Indexer:
                             files_processed=1,
                             items_processed=1,
                         )
-                        pending_files.append((item, relative, content, digest, cat_str, old_state is not None))
+                        pending_files.append((item, relative, content, digest, cat_str, old_state is not None, st_mtime_ns, st_size))
+
+                    if stat_updates:
+                        con.executemany("UPDATE files SET mtime_ns=?, size=? WHERE path=?", stat_updates)
+                        con.commit()
+
+                    if progress_callback is not None:
+                        progress_callback("repository_scan", len(files), len(files), telemetry)
 
                     # Parallel AST Parsing across available CPU threads
                     parse_results: dict[str, Any] = {}
@@ -838,8 +890,8 @@ class Indexer:
                         from concurrent.futures import ThreadPoolExecutor
                         num_workers = min(8, max(2, os.cpu_count() or 4))
 
-                        def _parse_task(task_entry: tuple[Any, str, str, str, str, bool]) -> tuple[str, Any]:
-                            _, p_rel, p_content, p_digest, _, _ = task_entry
+                        def _parse_task(task_entry: tuple[Any, str, str, str, str, bool, int, int]) -> tuple[str, Any]:
+                            _, p_rel, p_content, p_digest, _, _, _, _ = task_entry
                             p_cache = get_parse_cache()
                             p_lang = task_entry[0].language
                             p_cached = p_cache.get((p_digest, PARSER_VERSION, p_lang))
@@ -854,9 +906,13 @@ class Indexer:
                                 parse_results[p_rel] = res
 
                     # Sequential database writes with batch commits
-                    for idx, (item, relative, content, digest, cat_str, is_existing) in enumerate(pending_files):
+                    total_pending = len(pending_files)
+                    for idx, (item, relative, content, digest, cat_str, is_existing, st_mtime, st_sz) in enumerate(pending_files):
                         if idx > 0 and idx % batch_limit == 0:
                             self.governor.yield_if_needed(TaskPriority.BACKGROUND)
+
+                        if progress_callback is not None and (idx % 20 == 0 or idx == total_pending - 1):
+                            progress_callback("ast_parsing", idx + 1, total_pending, telemetry)
 
                         pre_res = parse_results.get(relative)
                         success = self._replace_file(
@@ -869,6 +925,8 @@ class Indexer:
                             is_existing=is_existing,
                             telemetry=telemetry,
                             precomputed_result=pre_res,
+                            mtime_ns=st_mtime,
+                            size=st_sz,
                         )
                         if success:
                             indexed += 1
@@ -1316,6 +1374,8 @@ class Indexer:
         is_existing: bool = True,
         telemetry: IndexingTelemetry | None = None,
         precomputed_result: Any | None = None,
+        mtime_ns: int = 0,
+        size: int = 0,
     ) -> bool:
         """Parse and insert a file. If parse fails, preserves last-known-good state."""
         from codegraph.security.redaction import redact_secrets
@@ -1370,13 +1430,13 @@ class Indexer:
             if old:
                 # Retain last-known-good index records, mark file as parse_failed
                 con.execute(
-                    "UPDATE files SET hash=?, status='parse_failed', parse_error=?, indexed_at=?, category=? WHERE path=?",
-                    (digest, redact_secrets(result.parse_error or ""), now, category, path),
+                    "UPDATE files SET hash=?, status='parse_failed', parse_error=?, indexed_at=?, category=?, mtime_ns=?, size=? WHERE path=?",
+                    (digest, redact_secrets(result.parse_error or ""), now, category, mtime_ns, size, path),
                 )
             else:
                 con.execute(
-                    "INSERT INTO files(path, hash, language, indexed_at, status, parse_error, category) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (path, digest, language, now, "parse_failed", redact_secrets(result.parse_error or ""), category),
+                    "INSERT INTO files(path, hash, language, indexed_at, status, parse_error, category, mtime_ns, size) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (path, digest, language, now, "parse_failed", redact_secrets(result.parse_error or ""), category, mtime_ns, size),
                 )
             if telemetry is not None:
                 telemetry.record("sqlite_writes", time.perf_counter() - t_sql, files_processed=1, db_writes=1)
@@ -1393,9 +1453,9 @@ class Indexer:
             db_write_count += 16
 
         con.execute(
-            "INSERT INTO files(path, hash, language, indexed_at, status, parse_error, last_valid_hash, category) "
-            "VALUES (?, ?, ?, ?, 'ok', NULL, ?, ?)",
-            (path, digest, language, now, digest, category),
+            "INSERT INTO files(path, hash, language, indexed_at, status, parse_error, last_valid_hash, category, mtime_ns, size) "
+            "VALUES (?, ?, ?, ?, 'ok', NULL, ?, ?, ?, ?)",
+            (path, digest, language, now, digest, category, mtime_ns, size),
         )
         db_write_count += 1
 

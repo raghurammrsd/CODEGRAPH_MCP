@@ -198,6 +198,7 @@ class ContextPacket(BaseModel):
     uncertainties: list[str] = []
 
     # Token budget & explicit boundary metadata
+    selection_rationale: dict[str, object] = field(default_factory=dict)
     candidate_tokens: int = 0
     selected_tokens: int = 0
     selected_lines: int = 0
@@ -224,6 +225,20 @@ class ContextPacket(BaseModel):
             f"**Intent**: {self.intent or 'UNDERSTAND'} | **Freshness**: {self.freshness} | **Selected Tokens**: ~{self.selected_tokens}",
             "",
         ]
+        if self.selection_rationale:
+            lines.append("## Why This Context Was Selected")
+            summary = self.selection_rationale.get("summary")
+            if summary:
+                lines.append(f"> {summary}\n")
+            relevance = self.selection_rationale.get("relevance_signals")
+            if isinstance(relevance, list) and relevance:
+                for sig in relevance:
+                    lines.append(f"- **Relevance**: {sig}")
+            budget_str = self.selection_rationale.get("budget_reduction")
+            if budget_str:
+                lines.append(f"- **Token Budget**: {budget_str}")
+            lines.append("")
+
         if self.symbols:
             lines.append("## Key Symbols")
             for s in self.symbols[:8]:
@@ -2126,6 +2141,30 @@ def _get_context_impl(
             "affected_package": target_pkg.package_id if target_pkg else None,
         }
 
+        caller_hops = sum(1 for r in relationships_out if r.relationship in ("CALLS", "CALLED_BY"))
+        route_hops = sum(1 for r in relationships_out if "ROUTE" in r.relationship)
+        test_hops = len(tests_out)
+
+        selection_rationale_dict: dict[str, object] = {
+            "intent": task_spec.intent,
+            "seed_targets": [
+                {"target": t, "resolution": "grounded_ast_symbol" if t in _target_resolutions else "search_query"}
+                for t in task_spec.targets
+            ],
+            "relevance_signals": [
+                f"Intent '{task_spec.intent}' prioritized {len(target_symbols)} direct AST symbol spans",
+                f"Graph traversal verified {len(relationships_out)} relationship edges up to depth {effective_max_depth}",
+                f"Selected {len(evidence_out)} bounded code evidence snippets across {len(selected_paths)} files",
+            ],
+            "expansion_hops": {
+                "calls": caller_hops,
+                "tests": test_hops,
+                "routes": route_hops,
+            },
+            "budget_reduction": f"{round(budget.reduction_ratio * 100, 1)}% tokens saved ({budget.candidate_tokens} candidate -> {budget.selected_tokens} selected)",
+            "summary": f"Context assembled for '{task_spec.intent}' intent: {len(symbols_out)} key symbols, {len(relationships_out)} relationships, and {len(evidence_out)} evidence snippets across {len(selected_paths)} files.",
+        }
+
         packet = ContextPacket(
             schema_version=SCHEMA_VERSION,
             task=task_display_str,
@@ -2141,6 +2180,7 @@ def _get_context_impl(
             budget=budget.as_dict(),
             execution=exec_dict,
             mode=mode_upper,
+            selection_rationale=selection_rationale_dict,
             entry_points=[
                 r for r in entry_points_out
                 if any(sp in str(r.get("file", "")) for sp in selected_paths)

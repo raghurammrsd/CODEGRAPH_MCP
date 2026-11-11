@@ -63,6 +63,19 @@ def is_shallow_repository(repository: Path) -> bool:
     return raw is not None and raw.strip().lower() == "true"
 
 
+def verify_git_ref(repository: Path, ref: str) -> tuple[bool, str | None]:
+    """Verify if a git ref exists in local commit history.
+
+    If missing and repository is shallow, returns (False, 'SHALLOW_CLONE_INSUFFICIENT_HISTORY').
+    """
+    raw = _git(repository, "rev-parse", "--verify", ref)
+    if raw is not None and raw.strip():
+        return True, None
+    if is_shallow_repository(repository):
+        return False, "SHALLOW_CLONE_INSUFFICIENT_HISTORY"
+    return False, "INVALID_GIT_REF"
+
+
 def current_commit(repository: Path) -> str | None:
     """Return the current HEAD commit SHA, or None if not a git repository."""
     raw = _git(repository, "rev-parse", "HEAD")
@@ -256,10 +269,12 @@ def analyze_change_impact(
     diffs = changed_files(repository, since=since, until=until)
     if not diffs and is_shallow_repository(repository):
         return {
-            "status": "warning",
-            "warning": "Repository is a shallow clone (e.g. cloned with --depth 1); Git history is insufficient. Run 'git fetch --unshallow' to enable full change impact analysis.",
+            "error": "SHALLOW_CLONE_INSUFFICIENT_HISTORY",
+            "status": "error",
+            "message": f"Git reference '{since}' cannot be resolved because the repository is a shallow clone (e.g. cloned with --depth 1) with insufficient commit history.",
+            "resolution": "Run 'git fetch --unshallow' to enable full change impact analysis, or compare against HEAD.",
             "is_shallow": True,
-            "changed_files": 0,
+            "changed_files": [],
             "affected_callers": [],
             "affected_tests": [],
             "affected_routes": [],

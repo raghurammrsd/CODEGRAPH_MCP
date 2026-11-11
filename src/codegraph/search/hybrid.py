@@ -247,7 +247,7 @@ def _search_repository_text_files(
         pass
 
 
-    skip_dirs = set(IGNORED_DIRS) | {"__pycache__"}
+    skip_dirs = (set(IGNORED_DIRS) - {"docs", "documentation", "_docs", "examples", "samples"}) | {"__pycache__"}
     if include_vendor:
         skip_dirs -= {"node_modules", "vendor", ".venv", "venv"}
     if include_build_artifacts:

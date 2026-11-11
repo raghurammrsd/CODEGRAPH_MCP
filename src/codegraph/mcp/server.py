@@ -367,11 +367,26 @@ def create_server(
         max_results: int = 10,
     ) -> list[dict[str, object]]:
         """Find test files and test functions statically linked to `symbol` (or `canonical_id` alias) via direct calls, imports, fixtures, or route invocation. USE THIS INSTEAD OF grep/search_code when asking 'what tests cover X?'. DO NOT guess test coverage from filename similarity alone. Returns verified test links (`TESTS_SYMBOL`, `TESTS_ROUTE`, `TESTS_PROVIDER`) with `confidence` and `evidence_class`."""
-        target = _resolve_symbol_arg(
+        target_sym = _resolve_symbol_arg(
             symbol=symbol, canonical_id=canonical_id, tool_name="find_tests"
         )
         with indexer.session() as con:
-            return [dict(r) for r in graph_find_related_tests(con, target, max_results=max_results)]
+            return [dict(r) for r in graph_find_related_tests(con, target_sym, max_results=max_results)]
+
+    def analyze_symbol_impact(
+        symbol: str = "",
+        canonical_id: str = "",
+        target: str = "",
+        name: str = "",
+        max_depth: int = 3,
+    ) -> dict[str, object]:
+        """Compute downstream callers, dependents, affected routes, and related tests if `symbol` is modified. Use before refactoring or changing a function/class signature. Does not prove runtime failure without inspecting call sites."""
+        effective_symbol = symbol or target or name
+        target_sym = _resolve_symbol_arg(
+            symbol=effective_symbol, canonical_id=canonical_id, tool_name="analyze_symbol_impact"
+        )
+        with indexer.session() as con:
+            return graph_analyze_impact(con, target_sym, max_depth=max_depth)
 
     def analyze_impact(
         symbol: str = "",
@@ -379,11 +394,7 @@ def create_server(
         max_depth: int = 3,
     ) -> dict[str, object]:
         """Compute downstream callers, dependents, affected routes, and related tests if `symbol` (or `canonical_id` alias) is modified. Use before refactoring or changing a function/class signature. Does not prove runtime failure without inspecting call sites."""
-        target = _resolve_symbol_arg(
-            symbol=symbol, canonical_id=canonical_id, tool_name="analyze_impact"
-        )
-        with indexer.session() as con:
-            return graph_analyze_impact(con, target, max_depth=max_depth)
+        return analyze_symbol_impact(symbol=symbol, canonical_id=canonical_id, max_depth=max_depth)
 
     def compile_task(
         query: str = "",
@@ -494,13 +505,24 @@ def create_server(
         """Return recent commits touching the specified repository file."""
         return git_get_file_history(indexer.repository, path, n=n)
 
+    def analyze_git_impact(
+        since: str = "HEAD~1",
+        until: str = "HEAD",
+        base: str = "",
+        head: str = "",
+    ) -> dict[str, object]:
+        """Analyze downstream callers, routes, and tests affected by changes between since and until revisions."""
+        eff_since = base or since
+        eff_until = head or until
+        with indexer.session() as con:
+            return git_analyze_change_impact(con, indexer.repository, since=eff_since, until=eff_until)
+
     def analyze_change_impact(
         since: str = "HEAD~1",
         until: str = "HEAD",
     ) -> dict[str, object]:
         """Analyze downstream callers and tests affected by changes between since and until."""
-        with indexer.session() as con:
-            return git_analyze_change_impact(con, indexer.repository, since=since, until=until)
+        return analyze_git_impact(since=since, until=until)
 
     def get_repository_status() -> dict[str, object]:
         """Get repository indexing status, freshness, symbol counts, and health (automatically hot-reloads in-memory caches when `.codegraph.sqlite3` is created or updated by `codegraph init` / `codegraph index`)."""
@@ -1651,48 +1673,62 @@ def create_server(
         "verify_evidence",
         "get_resource_status",
     }
-    developer_names = minimal_names | {
-        "find_references",
-        "find_callers",
-        "find_callees",
-        "get_call_graph",
-        "find_related_tests",
-        "analyze_impact",
-        "get_evidence",
-        "trace_call",
-        "get_graph",
-        "plan_retrieval",
-        "get_recent_changes",
-        "get_file_history",
-        "analyze_change_impact",
-    }
+    from codegraph.agent_capabilities import MCP_PROFILE_RECOMMENDATIONS
+    developer_names = set(cast(list[str], MCP_PROFILE_RECOMMENDATIONS["developer"]["included_tools"]))
 
     core12_tools: dict[str, Any] = {
         "find_symbol": find_symbol,
+        "find_references": find_references,
         "get_callers": get_callers,
         "get_callees": get_callees,
+        "trace_path": trace_path,
         "find_routes": find_routes,
-        "read_file_range": read_file_range,
-        "get_file_outline": get_file_outline,
-        "analyze_change_impact": analyze_change_impact,
         "find_db_models": find_db_models,
         "get_schema_impact": get_schema_impact,
-        "find_tests_for_symbol": find_tests_for_symbol,
+        "find_tests": find_tests,
+        "analyze_symbol_impact": analyze_symbol_impact,
+        "analyze_git_impact": analyze_git_impact,
         "safe_rename_symbol": safe_rename_symbol,
-        "get_architecture_summary": get_architecture_summary,
     }
 
-    if profile in ("core12", "12", "opinionated", "slim"):
+    pro30_tools: dict[str, Any] = {
+        **core12_tools,
+        "get_symbol": get_symbol_interrogation_wrapper,
+        "get_context": get_context,
+        "search_code": search_code,
+        "trace_flow": trace_flow,
+        "get_architecture": get_architecture,
+        "check_api_drift": check_api_drift,
+        "check_db_drift": check_db_drift,
+        "find_db_readers": find_db_readers,
+        "find_db_writers": find_db_writers,
+        "get_db_table": get_db_table,
+        "verify_architectural_rules": verify_architectural_rules,
+        "analyze_dataflow_taint": analyze_dataflow_taint,
+        "fast_graph_path": fast_graph_path,
+        "get_recent_changes": get_recent_changes,
+        "evaluate_speculative_patch": evaluate_speculative_patch,
+        "preview_semantic_patch": preview_semantic_patch,
+        "rollback_refactor": rollback_refactor,
+        "verify_evidence": verify_evidence,
+    }
+
+    norm_profile = profile.strip().lower() if profile else "core12"
+    if norm_profile in ("core12", "12", "opinionated", "slim"):
         selected_names = set(core12_tools.keys())
-    elif profile in ("agent", "default"):
+    elif norm_profile in ("pro30", "pro", "30"):
+        selected_names = set(pro30_tools.keys())
+    elif norm_profile in ("full", "all"):
+        selected_names = set(all_tools.keys())
+    elif norm_profile in ("agent", "default"):
         selected_names = agent_names
-    elif profile == "core":
+    elif norm_profile in ("core",):
         selected_names = core_names
-    elif profile == "graph":
+    elif norm_profile == "graph":
         selected_names = graph_names
-    elif profile == "minimal":
+    elif norm_profile == "minimal":
         selected_names = minimal_names
-    elif profile == "developer":
+    elif norm_profile == "developer":
         selected_names = developer_names
     else:
         from codegraph.agent_capabilities import (
@@ -1700,14 +1736,14 @@ def create_server(
             SUBTREE_PROFILES,
             TOOL_SUBTREES,
         )
-        if profile in MCP_PROFILE_RECOMMENDATIONS:
-            selected_names = set(cast(list[str], MCP_PROFILE_RECOMMENDATIONS[profile]["included_tools"]))
-        elif profile in SUBTREE_PROFILES:
-            selected_names = set(cast(list[str], SUBTREE_PROFILES[profile]["included_tools"]))
-        elif profile in TOOL_SUBTREES:
-            selected_names = set(cast(list[str], TOOL_SUBTREES[profile]["tools"]))
+        if norm_profile in MCP_PROFILE_RECOMMENDATIONS:
+            selected_names = set(cast(list[str], MCP_PROFILE_RECOMMENDATIONS[norm_profile]["included_tools"]))
+        elif norm_profile in SUBTREE_PROFILES:
+            selected_names = set(cast(list[str], SUBTREE_PROFILES[norm_profile]["included_tools"]))
+        elif norm_profile in TOOL_SUBTREES:
+            selected_names = set(cast(list[str], TOOL_SUBTREES[norm_profile]["tools"]))
         else:
-            selected_names = set(all_tools.keys())
+            selected_names = set(core12_tools.keys())
 
     _last_db_sig: list[tuple[int, int, int, int] | None] = [None]
 
@@ -1738,7 +1774,7 @@ def create_server(
             return True
         return False
 
-    available_tool_pool: dict[str, Any] = {**all_tools, **core12_tools}
+    available_tool_pool: dict[str, Any] = {**all_tools, **pro30_tools, **core12_tools}
     for tool_name in sorted(selected_names):
         target_fn: Any = available_tool_pool[tool_name]
 

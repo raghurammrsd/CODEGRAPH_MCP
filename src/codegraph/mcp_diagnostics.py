@@ -444,9 +444,18 @@ def run_mcp_doctor(
                 schemas_valid = False
 
             tool_set = set(discovered_tool_names)
-            required_subset = {"resolve_symbol", "get_callers", "trace_path"}
-            if profile != "core":
-                required_subset.add("get_context")
+            if profile in ("core12", "12", "opinionated"):
+                required_subset = {"find_symbol", "get_callers", "trace_path"}
+            elif profile == "core":
+                required_subset = {"resolve_symbol", "get_callers", "trace_path"}
+            else:
+                required_subset = {"get_callers", "trace_path"}
+                if "find_symbol" in tool_set:
+                    required_subset.add("find_symbol")
+                elif "resolve_symbol" in tool_set:
+                    required_subset.add("resolve_symbol")
+                if profile not in ("core", "core12", "12", "opinionated"):
+                    required_subset.add("get_context")
             missing = sorted(required_subset - tool_set)
             disc_ok = len(missing) == 0 and schemas_valid and len(discovered_tool_names) > 0
             detail = (

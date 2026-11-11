@@ -297,6 +297,12 @@ def run_with_telemetry(
 
     env = dict(os.environ)
 
+    # Inject standard OpenTelemetry exporters and endpoint
+    env.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4318/v1/traces")
+    env.setdefault("OTEL_TRACES_EXPORTER", "otlp")
+    env.setdefault("OTEL_EXPORTER_OTLP_PROTOCOL", "http/json")
+    env.setdefault("CODEGRAPH_RUNTIME_RECORD", "1")
+
     # Inject Node hook
     old_node_opts = env.get("NODE_OPTIONS", "")
     env["NODE_OPTIONS"] = f"--require {node_hook} {old_node_opts}".strip()

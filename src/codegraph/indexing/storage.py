@@ -482,19 +482,17 @@ POSTGRES_SCHEMA_STATEMENTS: tuple[str, ...] = (
     );
     """,
     # 22. Indexes for fast queries
-    """
-    CREATE INDEX IF NOT EXISTS idx_symbols_canonical ON symbols (canonical_id);
-    CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols (name);
-    CREATE INDEX IF NOT EXISTS idx_symbols_qualified ON symbols (qualified_name);
-    CREATE INDEX IF NOT EXISTS idx_symbols_path ON symbols (path);
-    CREATE INDEX IF NOT EXISTS idx_routes_file ON framework_routes (file_path);
-    CREATE INDEX IF NOT EXISTS idx_routes_handler ON framework_routes (handler_canonical_id);
-    CREATE INDEX IF NOT EXISTS idx_edges_source ON graph_edges (source);
-    CREATE INDEX IF NOT EXISTS idx_edges_target ON graph_edges (target);
-    CREATE INDEX IF NOT EXISTS idx_edges_rel ON graph_edges (relationship);
-    CREATE INDEX IF NOT EXISTS idx_calls_source ON calls (source_path);
-    CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls (callee);
-    """,
+    "CREATE INDEX IF NOT EXISTS idx_symbols_canonical ON symbols (canonical_id);",
+    "CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols (name);",
+    "CREATE INDEX IF NOT EXISTS idx_symbols_qualified ON symbols (qualified_name);",
+    "CREATE INDEX IF NOT EXISTS idx_symbols_path ON symbols (path);",
+    "CREATE INDEX IF NOT EXISTS idx_routes_file ON framework_routes (file_path);",
+    "CREATE INDEX IF NOT EXISTS idx_routes_handler ON framework_routes (handler_canonical_id);",
+    "CREATE INDEX IF NOT EXISTS idx_edges_source ON graph_edges (source);",
+    "CREATE INDEX IF NOT EXISTS idx_edges_target ON graph_edges (target);",
+    "CREATE INDEX IF NOT EXISTS idx_edges_rel ON graph_edges (relationship);",
+    "CREATE INDEX IF NOT EXISTS idx_calls_source ON calls (source_path);",
+    "CREATE INDEX IF NOT EXISTS idx_calls_callee ON calls (callee);",
 )
 
 

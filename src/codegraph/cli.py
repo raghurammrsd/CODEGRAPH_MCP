@@ -172,22 +172,38 @@ def index(
         "final_commit_checkpoint": "Final Commit & Checkpoint",
     }
 
+    import time
+    last_print = 0.0
+
     def _on_progress(phase_key: str, current: int, total: int, tel: IndexingTelemetry) -> None:
-        if not verbose or quiet or json_output:
+        nonlocal last_print
+        if quiet or json_output:
             return
         label = _PHASE_LABELS.get(phase_key, phase_key)
-        block = format_progress_block(
-            label,
-            current,
-            total,
-            tel.total_elapsed_seconds or (time.perf_counter() - tel.started_at),
-            memory_mb=tel.peak_rss_mb,
-        )
-        typer.echo(block)
+        elapsed = tel.total_elapsed_seconds or (time.perf_counter() - tel.started_at)
+        if verbose:
+            block = format_progress_block(
+                label,
+                current,
+                total,
+                elapsed,
+                memory_mb=tel.peak_rss_mb,
+            )
+            typer.echo(block)
+            return
 
-    import time
+        now = time.perf_counter()
+        if now - last_print < 0.1 and current < total:
+            return
+        last_print = now
+        total_safe = max(1, total)
+        pct = min(100.0, (current / total_safe) * 100)
+        rate = current / max(0.001, elapsed)
+        typer.echo(f"\rIndexing: [{current:,}/{total_safe:,} files] {pct:5.1f}% • {rate:,.0f} files/s • {label}   ", nl=False)
 
-    result = idx_inst.index(progress_callback=_on_progress if verbose else None, catch_interrupt=True)
+    result = idx_inst.index(progress_callback=_on_progress, catch_interrupt=True)
+    if not verbose and not quiet and not json_output:
+        typer.echo("\r" + " " * 80 + "\r", nl=False)
     tel = idx_inst.last_telemetry
 
     if json_output:
@@ -822,6 +838,176 @@ def lsp_cmd(
         return
 
     run_stdio_lsp_server(repo)
+
+
+otel_app = typer.Typer(no_args_is_help=True, help="OpenTelemetry runtime instrumentation and environment configuration.")
+
+
+@otel_app.command("env")
+def otel_env_cmd(
+    shell: Annotated[str, typer.Option("--shell", "-s", help="Shell syntax: bash | zsh | fish | powershell")] = "bash",
+    port: Annotated[int, typer.Option("--port", "-p", help="OTel listener port")] = 4318,
+    host: Annotated[str, typer.Option("--host", help="OTel listener host")] = "127.0.0.1",
+) -> None:
+    """Print copy-pasteable environment variables for OpenTelemetry trace exporter."""
+    endpoint = f"http://{host}:{port}/v1/traces"
+    shell_norm = shell.lower().strip()
+    if shell_norm in ("fish",):
+        typer.echo(f"set -gx OTEL_EXPORTER_OTLP_ENDPOINT {endpoint}")
+        typer.echo("set -gx OTEL_TRACES_EXPORTER otlp")
+        typer.echo("set -gx OTEL_EXPORTER_OTLP_PROTOCOL http/json")
+        typer.echo("set -gx CODEGRAPH_RUNTIME_RECORD 1")
+    elif shell_norm in ("powershell", "ps1", "pwsh"):
+        typer.echo(f'$env:OTEL_EXPORTER_OTLP_ENDPOINT="{endpoint}"')
+        typer.echo('$env:OTEL_TRACES_EXPORTER="otlp"')
+        typer.echo('$env:OTEL_EXPORTER_OTLP_PROTOCOL="http/json"')
+        typer.echo('$env:CODEGRAPH_RUNTIME_RECORD="1"')
+    else:
+        typer.echo(f'export OTEL_EXPORTER_OTLP_ENDPOINT="{endpoint}"')
+        typer.echo('export OTEL_TRACES_EXPORTER="otlp"')
+        typer.echo('export OTEL_EXPORTER_OTLP_PROTOCOL="http/json"')
+        typer.echo('export CODEGRAPH_RUNTIME_RECORD="1"')
+
+
+@otel_app.command("listen")
+def otel_listen_subcmd(
+    port: Annotated[int, typer.Option("--port", "-p", help="Listening port")] = 4318,
+    host: Annotated[str, typer.Option("--host", "-h", help="Listening host")] = "127.0.0.1",
+    path: Annotated[Path | None, typer.Argument(help="Repository path")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+) -> None:
+    """Run lightweight embedded OpenTelemetry trace receiver."""
+    otel_listen_cmd(port=port, host=host, path=path, repository=repository)
+
+
+app.add_typer(otel_app, name="otel")
+
+
+@app.command("review")
+def review_cmd(
+    base: Annotated[str, typer.Option("--base", "-b", help="Base git ref or commit")] = "origin/main",
+    head: Annotated[str, typer.Option("--head", "-h", help="Head git ref or commit")] = "HEAD",
+    pr: Annotated[bool, typer.Option("--pr", help="Generate GitHub PR review Markdown format")] = True,
+    gitlab: Annotated[bool, typer.Option("--gitlab", help="Generate GitLab MR review Markdown format")] = False,
+    output: Annotated[Path | None, typer.Option("--output", "-o", help="Write review report to file")] = None,
+    fail_on_high_risk: Annotated[bool, typer.Option("--fail-on-high-risk", help="Exit code 1 if blast radius score exceeds 75")] = False,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json")] = False,
+) -> None:
+    """Analyze Pull Request diff, blast radius, untested symbols, and database schema drift."""
+    del pr, gitlab
+    repo = _resolve_repo(repository=repository)
+    if not _ensure_indexed(repo):
+        return
+
+    from codegraph.git import analyze_change_impact
+    from codegraph.runtime.db_watcher import detect_schema_drift
+
+    with _indexer(repo).session() as con:
+        impact = analyze_change_impact(con, repo, since=base, until=head)
+        db_drift = detect_schema_drift(con, repo).as_dict()
+
+    if impact.get("error") == "SHALLOW_CLONE_INSUFFICIENT_HISTORY":
+        typer.echo(f"Error: {impact.get('message')}")
+        typer.echo(f"Resolution: {impact.get('resolution')}")
+        raise typer.Exit(code=1)
+
+    changed_files_list = impact.get("changed_files", [])
+    changed_symbols_list = impact.get("changed_symbols", [])
+    callers = impact.get("affected_callers", [])
+    routes = impact.get("affected_routes", [])
+    tests = impact.get("affected_tests", [])
+    removed_symbols = impact.get("removed_symbols", [])
+
+    # Calculate blast radius score (0-100)
+    blast_radius = min(
+        100,
+        len(changed_files_list) * 2
+        + len(changed_symbols_list) * 5
+        + len(callers) * 3
+        + len(routes) * 8
+        + len(removed_symbols) * 6
+    )
+
+    # Detect untested changes
+    tested_symbol_names = {t.get("symbol") for t in tests if isinstance(t, dict) and t.get("symbol")}
+    untested_symbols = [s for s in changed_symbols_list if s not in tested_symbol_names]
+
+    if json_output:
+        payload = {
+            "blast_radius_score": blast_radius,
+            "base": base,
+            "head": head,
+            "changed_files_count": len(changed_files_list),
+            "changed_symbols": changed_symbols_list,
+            "untested_symbols": untested_symbols,
+            "affected_callers_count": len(callers),
+            "affected_routes_count": len(routes),
+            "affected_tests_count": len(tests),
+            "db_drift": db_drift,
+            "impact": impact,
+        }
+        typer.echo(json.dumps(payload, indent=2))
+        if fail_on_high_risk and blast_radius > 75:
+            raise typer.Exit(code=1)
+        return
+
+    # Build Markdown
+    risk_level = "LOW RISK" if blast_radius < 30 else ("MODERATE RISK" if blast_radius <= 75 else "HIGH RISK")
+    risk_badge = f"`{blast_radius} / 100` ({risk_level})"
+    lines = [
+        "### CodeGraph Pull Request Intelligence & Blast Radius Report\n",
+        f"Comparing `{base}` -> `{head}`\n",
+        "| Metric | Result | Status |",
+        "| :--- | :--- | :--- |",
+        f"| **Blast Radius Score** | {risk_badge} | {'High Risk' if blast_radius > 75 else ('Moderate' if blast_radius >= 30 else 'Low Risk')} |",
+        f"| **Changed Files** | `{len(changed_files_list)}` | - |",
+        f"| **Modified Symbols** | `{len(changed_symbols_list)}` | - |",
+        f"| **Affected Downstream Callers** | `{len(callers)}` | - |",
+        f"| **Affected Routes / Endpoints** | `{len(routes)}` | - |",
+        f"| **Covering Tests** | `{len(tests)}` | {'Needs test coverage' if untested_symbols else 'Covered'} |",
+        "",
+    ]
+
+    if untested_symbols:
+        lines.append("#### Untested Modified Symbols")
+        lines.append("> The following modified symbols have 0 statically verified test references:\n")
+        for sym in untested_symbols[:15]:
+            lines.append(f"- `{sym}`")
+        if len(untested_symbols) > 15:
+            lines.append(f"- ... and {len(untested_symbols) - 15} more")
+        lines.append("")
+
+    if callers:
+        lines.append("<details>")
+        lines.append(f"<summary><b>Downstream Affected Callers ({len(callers)})</b></summary>\n")
+        for c in callers[:20]:
+            lines.append(f"- `{c.get('symbol', 'unknown')}` in `{c.get('file', '')}`")
+        if len(callers) > 20:
+            lines.append(f"- ... and {len(callers) - 20} more")
+        lines.append("\n</details>\n")
+
+    if routes:
+        lines.append("<details>")
+        lines.append(f"<summary><b>Affected Routes & Entrypoints ({len(routes)})</b></summary>\n")
+        for r in routes[:15]:
+            m = r.get("method") or r.get("http_method") or "ROUTE"
+            p = r.get("path") or r.get("route_path") or ""
+            h = r.get("handler") or r.get("handler_name") or ""
+            lines.append(f"- `{m} {p}` -> `{h}`")
+        lines.append("\n</details>\n")
+
+    lines.append("> Deterministic codebase intelligence powered by CodeGraph.")
+    report_md = "\n".join(lines)
+
+    if output is not None:
+        output.write_text(report_md, encoding="utf-8")
+        typer.echo(f"PR review markdown written to {output}")
+    else:
+        typer.echo(report_md)
+
+    if fail_on_high_risk and blast_radius > 75:
+        raise typer.Exit(code=1)
 
 
 @app.command()
