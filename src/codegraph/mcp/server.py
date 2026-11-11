@@ -464,6 +464,8 @@ def create_server(
         mode: str = "BALANCED",
         explain: bool = False,
         resource_mode: str | None = None,
+        compact: bool = True,
+        tokenizer_profile: str = "o200k_base",
     ) -> dict[str, object]:
         """Compile a token-bounded, coverage-optimized ContextPacket for a `query` (or `task` alias: natural-language question, symbol/route target, or structured TaskSpec). Enforces strict pre-serialization boundaries (`budget_tokens` / `max_tokens`, `max_files`, `max_lines`) and returns explicit budget metadata (`selected_tokens`, `candidate_tokens`, `selected_files`, `selected_lines`, `coverage_score`, `truncated`). Example: `get_context(query="Trace InventoryService.place_order callers and tests", intent="TRACE", budget_tokens=2000)`."""
         effective_task = _resolve_task_or_query_input(task=task, query=query)
@@ -484,7 +486,9 @@ def create_server(
                 mode=effective_mode,
                 explain=explain,
             )
-            return packet.to_wire_dict(compact=not explain, explain=explain, max_tokens=effective_budget)
+            if not compact:
+                return packet.to_wire_dict(compact=False, explain=explain, max_tokens=effective_budget)
+            return packet.to_compact_dict(max_tokens=effective_budget, profile=tokenizer_profile, explain=explain)
 
     def get_recent_changes(
         since: str = "HEAD~10",
@@ -671,8 +675,46 @@ def create_server(
             raise ValueError("limit must be 1..100")
         return [{"key": key, "value": value} for key, value in memory.search(query, limit)]
 
-    def get_evidence(path: str, symbol: str | None = None) -> list[dict[str, object]]:
-        """Return source-derived evidence for a safe indexed file, optionally narrowed to one symbol."""
+    def get_evidence(
+        path: str = "",
+        symbol: str | None = None,
+        ids: list[str] | None = None,
+    ) -> list[dict[str, object]]:
+        """Return source-derived evidence for a safe indexed file, optionally narrowed to one symbol or specific evidence IDs."""
+        if ids:
+            from codegraph.evidence import get_evidence_by_ids
+
+            results: list[dict[str, object]] = [ev.as_dict() for ev in get_evidence_by_ids(ids)]
+            found_ids = {str(r.get("evidence_id") or r.get("id")) for r in results}
+            missing_ids = [i for i in ids if i not in found_ids]
+            if missing_ids:
+                with indexer.session() as con:
+                    pl = ",".join("?" for _ in missing_ids)
+                    try:
+                        rows = con.execute(
+                            f"SELECT file, start_line, end_line, source, target, relationship, evidence, evidence_id FROM graph_edges WHERE evidence_id IN ({pl})",
+                            missing_ids,
+                        ).fetchall()
+                        for row in rows:
+                            results.append({
+                                "id": row["evidence_id"],
+                                "evidence_id": row["evidence_id"],
+                                "file": row["file"],
+                                "start_line": row["start_line"],
+                                "end_line": row["end_line"],
+                                "symbol": row["source"],
+                                "snippet": row["evidence"],
+                                "relationship": row["relationship"],
+                                "confidence": "HIGH",
+                            })
+                    except Exception:
+                        pass
+            if results or not path:
+                return results
+
+        if not path:
+            return []
+
         resolved = safe_path(indexer.repository, path)
         relative = resolved.relative_to(indexer.repository)
         if is_sensitive(relative):

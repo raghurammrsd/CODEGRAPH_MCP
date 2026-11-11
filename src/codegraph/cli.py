@@ -912,12 +912,18 @@ def review_cmd(
         typer.echo(f"Resolution: {impact.get('resolution')}")
         raise typer.Exit(code=1)
 
-    changed_files_list = impact.get("changed_files", [])
-    changed_symbols_list = impact.get("changed_symbols", [])
-    callers = impact.get("affected_callers", [])
-    routes = impact.get("affected_routes", [])
-    tests = impact.get("affected_tests", [])
-    removed_symbols = impact.get("removed_symbols", [])
+    raw_cf = impact.get("changed_files")
+    changed_files_list: list[Any] = raw_cf if isinstance(raw_cf, list) else []
+    raw_cs = impact.get("changed_symbols")
+    changed_symbols_list: list[Any] = raw_cs if isinstance(raw_cs, list) else []
+    raw_callers = impact.get("affected_callers")
+    callers: list[Any] = raw_callers if isinstance(raw_callers, list) else []
+    raw_routes = impact.get("affected_routes")
+    routes: list[Any] = raw_routes if isinstance(raw_routes, list) else []
+    raw_tests = impact.get("affected_tests")
+    tests: list[Any] = raw_tests if isinstance(raw_tests, list) else []
+    raw_rem = impact.get("removed_symbols")
+    removed_symbols: list[Any] = raw_rem if isinstance(raw_rem, list) else []
 
     # Calculate blast radius score (0-100)
     blast_radius = min(

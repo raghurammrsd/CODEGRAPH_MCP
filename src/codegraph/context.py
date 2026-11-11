@@ -148,6 +148,15 @@ class EvidenceRef(BaseModel):
     confidence: str
     source_hash: str | None = None
     evidence_status: str = "current"  # current | stale
+    evidence_id: str | None = None
+
+    def model_post_init(self, __context: Any) -> None:
+        if not self.evidence_id:
+            import hashlib
+            raw = f"{self.file}:{self.start_line}:{self.end_line}:{self.symbol or ''}:DEFINES"
+            eid = "ev_" + hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+            object.__setattr__(self, "evidence_id", eid)
+
 
 
 class ContextPacket(BaseModel):
@@ -217,7 +226,7 @@ class ContextPacket(BaseModel):
         compact: bool = True,
         explain: bool = False,
         max_tokens: int = 1000,
-    ) -> dict[str, object]:
+    ) -> dict[str, Any]:
         """Serialize ContextPacket into a token-bounded wire dictionary.
 
         When compact=True and explain=False (default for MCP/CLI), internal
@@ -234,7 +243,7 @@ class ContextPacket(BaseModel):
         if self.selection_rationale:
             summary = str(self.selection_rationale.get("summary") or "")
 
-        wire: dict[str, object] = {
+        wire: dict[str, Any] = {
             "schema_version": self.schema_version,
             "task": self.task,
             "intent": self.intent or "UNDERSTAND",
@@ -349,8 +358,9 @@ class ContextPacket(BaseModel):
                 for t in self.tests[:8]
             ]
 
-        if self.selection_rationale and self.selection_rationale.get("child_tools"):
-            wire["child_tools"] = self.selection_rationale["child_tools"][:20]
+        tools_cand = self.selection_rationale.get("child_tools") if self.selection_rationale else None
+        if isinstance(tools_cand, list):
+            wire["child_tools"] = list(tools_cand[:20])
 
         def _calc_tokens(d: dict[str, object]) -> int:
             try:
@@ -425,6 +435,202 @@ class ContextPacket(BaseModel):
 
         return wire
 
+    def to_compact_dict(
+        self,
+        max_tokens: int = 1000,
+        profile: str = "o200k_base",
+        explain: bool = False,
+    ) -> dict[str, Any]:
+        """Serialize ContextPacket into an ultra-dense, token-budget-bounded dictionary.
+
+        - Callers and tests are formatted as ultra-dense 4-element lists:
+          [canonical_id, "file:line", evidence_class, evidence_id]
+        - Target Header Guard: If the target header alone cannot fit inside max_tokens,
+          returns {"status": "BUDGET_TOO_SMALL", "required_tokens": ..., "max_tokens": ...}.
+        - Greedy Truncator: Pops lowest-priority callers/tests until token count <= effective_cap.
+        - Machine Drill-Down: Emits "evidence_ids": ["ev_1", "ev_2", ...] so agents can fetch proof without parsing prose.
+        - Audit Cap: Caps explain=True at min(max_tokens, 20000).
+        """
+        from codegraph.evidence import Evidence, register_evidence
+        from codegraph.llm.tokenizer import count_json_tokens, get_effective_cap
+
+        eff_max_tokens = min(max_tokens, 20000) if explain else max_tokens
+        effective_cap = get_effective_cap(eff_max_tokens)
+
+        # Target Header
+        target_info: dict[str, Any] = {}
+        if isinstance(self.target, dict):
+            raw = self.target.get("raw_targets")
+            if raw:
+                target_info["targets"] = raw
+            resolutions = self.target.get("resolutions")
+            if isinstance(resolutions, dict) and resolutions:
+                target_info["resolved"] = [
+                    {
+                        "name": v.get("qualified_name") or k,
+                        "file": v.get("file_path"),
+                        "confidence": v.get("confidence"),
+                    }
+                    for k, v in resolutions.items()
+                    if isinstance(v, dict)
+                ]
+            if "canonical_id" in self.target:
+                target_info["canonical_id"] = self.target["canonical_id"]
+        elif isinstance(self.target, str) and self.target:
+            target_info["target"] = self.target
+
+        if not target_info and self.symbols:
+            top_s = self.symbols[0]
+            target_info["target"] = top_s.symbol
+            target_info["canonical_id"] = top_s.canonical_id
+            target_info["file"] = top_s.file
+
+        header: dict[str, Any] = {
+            "status": "OK",
+            "schema_version": self.schema_version,
+            "task": self.task,
+            "intent": self.intent or "UNDERSTAND",
+            "freshness": self.freshness,
+        }
+        if target_info:
+            header["target"] = target_info
+
+        # Target Header Guard
+        header_tokens = count_json_tokens(header, profile=profile)
+        if header_tokens > effective_cap or header_tokens > eff_max_tokens:
+            return {
+                "status": "BUDGET_TOO_SMALL",
+                "required_tokens": header_tokens,
+                "max_tokens": max_tokens,
+            }
+
+        # Build Callers
+        callers: list[list[Any]] = []
+        target_str = str(target_info)
+        for r in self.relationships:
+            is_caller = (
+                r.relationship in ("CALLS", "CALLED_BY", "POSSIBLE_CALLS", "DISPATCHES_TO", "HANDLES", "CALLER")
+                or (bool(r.target) and r.target in target_str)
+                or (bool(r.source) and r.source in target_str)
+            )
+            if is_caller:
+                c_id = r.source
+                c_loc = f"{r.file or 'unknown'}:{r.start_line or 1}"
+                c_ev_cls = r.evidence_class or "AST_VERIFIED"
+                ev = Evidence(
+                    file=r.file or "",
+                    start_line=r.start_line or 1,
+                    end_line=r.start_line or 1,
+                    symbol=r.source,
+                    snippet=r.evidence or f"{r.source} -> {r.target}",
+                    relationship=r.relationship,
+                    confidence=r.confidence or "HIGH",
+                )
+                register_evidence(ev)
+                callers.append([c_id, c_loc, c_ev_cls, ev.evidence_id])
+
+        if not callers and len(self.symbols) > 1:
+            for s in self.symbols[1:10]:
+                ev = Evidence(
+                    file=s.file or "",
+                    start_line=s.start_line or 1,
+                    end_line=s.end_line or s.start_line or 1,
+                    symbol=s.canonical_id,
+                    snippet=f"Symbol {s.symbol} defined at {s.file}:{s.start_line}",
+                    relationship="DEFINES",
+                    confidence="HIGH",
+                )
+                register_evidence(ev)
+                callers.append([s.canonical_id, f"{s.file}:{s.start_line or 1}", "AST_VERIFIED", ev.evidence_id])
+
+        # Build Tests
+        tests: list[list[Any]] = []
+        for t in self.tests:
+            t_id = t.symbol or t.file
+            t_loc = f"{t.file}:1"
+            ev_text = str(t.evidence or "")
+            t_ev_cls = "FRAMEWORK_VERIFIED" if ("pytest" in ev_text.lower() or "test" in ev_text.lower()) else "STATIC_VERIFIED"
+            ev = Evidence(
+                file=t.file,
+                start_line=1,
+                end_line=1,
+                symbol=t.symbol,
+                snippet=ev_text or f"Test reference for {t_id}",
+                relationship="TESTS",
+                confidence=t.confidence or "HIGH",
+            )
+            register_evidence(ev)
+            tests.append([t_id, t_loc, t_ev_cls, ev.evidence_id])
+
+        # Standalone evidence registration
+        standalone_eids: list[str] = []
+        for ev_ref in self.evidence:
+            ev = Evidence(
+                file=ev_ref.file,
+                start_line=ev_ref.start_line,
+                end_line=ev_ref.end_line,
+                symbol=ev_ref.symbol,
+                snippet=ev_ref.snippet,
+                confidence=ev_ref.confidence or "HIGH",
+                evidence_id=ev_ref.evidence_id or "",
+            )
+            register_evidence(ev)
+            standalone_eids.append(ev.evidence_id)
+
+        result: dict[str, Any] = dict(header)
+        if callers:
+            result["callers"] = list(callers)
+        if tests:
+            result["tests"] = list(tests)
+        if self.uncertainties:
+            result["uncertainties"] = list(self.uncertainties[:5])
+        if explain and self.selection_rationale:
+            result["explain"] = self.selection_rationale
+
+        def _update_evidence_ids(res: dict[str, Any]) -> None:
+            active_ids: list[str] = []
+            for c in res.get("callers", []):
+                if len(c) > 3 and c[3]:
+                    active_ids.append(str(c[3]))
+            for t in res.get("tests", []):
+                if len(t) > 3 and t[3]:
+                    active_ids.append(str(t[3]))
+            active_ids.extend(standalone_eids)
+            res["evidence_ids"] = list(dict.fromkeys(active_ids))
+
+        _update_evidence_ids(result)
+
+        # Greedy Truncator loop
+        while count_json_tokens(result, profile=profile) > effective_cap:
+            if result.get("tests") and len(result["tests"]) >= len(result.get("callers", [])):
+                result["tests"].pop()
+                if not result["tests"]:
+                    result.pop("tests", None)
+            elif result.get("callers"):
+                result["callers"].pop()
+                if not result["callers"]:
+                    result.pop("callers", None)
+            elif result.get("explain"):
+                result.pop("explain", None)
+            elif result.get("uncertainties"):
+                result.pop("uncertainties", None)
+            else:
+                break
+            _update_evidence_ids(result)
+
+        if count_json_tokens(result, profile=profile) > effective_cap:
+            _update_evidence_ids(header)
+            if count_json_tokens(header, profile=profile) <= effective_cap:
+                return header
+            return {
+                "status": "BUDGET_TOO_SMALL",
+                "required_tokens": count_json_tokens(header, profile=profile),
+                "max_tokens": max_tokens,
+            }
+
+        return result
+
+
     def as_dict(
         self,
         compact: bool = False,
@@ -490,10 +696,11 @@ class ContextPacket(BaseModel):
                 lines.append(f"- `{method} {path}` -> `{handler}`")
             lines.append("")
 
-        if self.selection_rationale and self.selection_rationale.get("child_tools"):
+        tools = self.selection_rationale.get("child_tools") if self.selection_rationale else None
+        if isinstance(tools, list):
             lines.append("## Registered Nested Tools")
-            tools = self.selection_rationale["child_tools"]
-            lines.append(f"> Defined tools ({len(tools)}): `{', '.join(tools[:12])}`")
+            tools_str = [str(x) for x in tools]
+            lines.append(f"> Defined tools ({len(tools_str)}): `{', '.join(tools_str[:12])}`")
             lines.append("> *Use `codegraph context <tool_name>` to inspect an individual tool handler.*")
             lines.append("")
 

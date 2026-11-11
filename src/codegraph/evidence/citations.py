@@ -416,3 +416,32 @@ def verify_evidence(
         evidence_id=resolved_id,
         index_generation=gen,
     )
+
+
+_EVIDENCE_REGISTRY: dict[str, Evidence] = {}
+
+
+def register_evidence(ev: Evidence) -> str:
+    """Register an Evidence instance in the process evidence store."""
+    if len(_EVIDENCE_REGISTRY) > 20000:
+        keys = list(_EVIDENCE_REGISTRY.keys())[:5000]
+        for k in keys:
+            _EVIDENCE_REGISTRY.pop(k, None)
+    _EVIDENCE_REGISTRY[ev.evidence_id] = ev
+    return ev.evidence_id
+
+
+def get_evidence_by_id(eid: str) -> Evidence | None:
+    """Lookup registered Evidence by id."""
+    return _EVIDENCE_REGISTRY.get(eid)
+
+
+def get_evidence_by_ids(eids: list[str]) -> list[Evidence]:
+    """Lookup registered Evidence items for given ids."""
+    res: list[Evidence] = []
+    for eid in eids:
+        ev = _EVIDENCE_REGISTRY.get(eid)
+        if ev is not None:
+            res.append(ev)
+    return res
+

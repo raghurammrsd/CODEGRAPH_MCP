@@ -935,10 +935,10 @@ class Indexer:
                             dirty_files.add(relative)
                             if is_body_only:
                                 body_only_files.add(relative)
-                            existing_files[relative] = (digest, "ok")
+                            existing_files[relative] = (digest, "ok", st_mtime, st_sz)
                         else:
                             parse_failed_count += 1
-                            existing_files[relative] = (digest, "parse_failed")
+                            existing_files[relative] = (digest, "parse_failed", st_mtime, st_sz)
 
                         uncommitted_in_batch += 1
                         if uncommitted_in_batch >= self.commit_batch_size:
@@ -1416,7 +1416,7 @@ class Indexer:
         precomputed_result: Any | None = None,
         mtime_ns: int = 0,
         size: int = 0,
-    ) -> bool:
+    ) -> tuple[bool, bool]:
         """Parse and insert a file. If parse fails, preserves last-known-good state."""
         from codegraph.security.redaction import redact_secrets
 
@@ -1834,7 +1834,7 @@ class Indexer:
         )
         if len(old_syms) != len(new_syms):
             return False
-        for old_s, new_s in zip(old_syms, new_syms):
+        for old_s, new_s in zip(old_syms, new_syms, strict=True):
             if (old_s[0], old_s[1], old_s[2] or "", old_s[3] or "") != new_s:
                 return False
 
@@ -1858,7 +1858,7 @@ class Indexer:
         )
         if len(old_imps) != len(new_imps):
             return False
-        for old_i, new_i in zip(old_imps, new_imps):
+        for old_i, new_i in zip(old_imps, new_imps, strict=True):
             if (old_i[0] or "", old_i[1] or "", old_i[2] or "", old_i[3] or "", old_i[4] or "") != new_i:
                 return False
 
@@ -1904,7 +1904,7 @@ class Indexer:
         )
         if len(old_mounts) != len(new_mounts):
             return False
-        for old_m, new_m in zip(old_mounts, new_mounts):
+        for old_m, new_m in zip(old_mounts, new_mounts, strict=True):
             if (old_m[0] or "", old_m[1] or "", old_m[2] or "") != new_m:
                 return False
 
@@ -1919,7 +1919,7 @@ class Indexer:
         )
         if len(old_rdefs) != len(new_rdefs):
             return False
-        for old_rd, new_rd in zip(old_rdefs, new_rdefs):
+        for old_rd, new_rd in zip(old_rdefs, new_rdefs, strict=True):
             if (old_rd[0] or "", old_rd[1] or "") != new_rd:
                 return False
 
@@ -2148,7 +2148,6 @@ class Indexer:
         """Run repository-wide reference resolution, updating 'references' and 'graph_edges'."""
         from codegraph.security.redaction import redact_secrets
 
-        t_prep = time.perf_counter()
         # 1. Load all files
         file_rows = con.execute("SELECT path, hash, language FROM files WHERE status='ok'").fetchall()
         known_files = {str(r["path"]) for r in file_rows}

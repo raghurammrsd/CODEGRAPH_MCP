@@ -936,7 +936,7 @@ TOOL_CAPABILITY_REGISTRY: tuple[ToolCapabilitySpec, ...] = (
             AgentTaskCategory.PACKAGE.value,
         ),
         required_inputs=("query",),
-        optional_inputs=("task", "intent", "max_tokens", "budget_tokens", "max_files", "max_lines", "top_k", "plan", "mode", "explain", "resource_mode"),
+        optional_inputs=("task", "intent", "max_tokens", "budget_tokens", "max_files", "max_lines", "top_k", "plan", "mode", "explain", "resource_mode", "compact", "tokenizer_profile"),
         expected_output_type="ContextPacket",
         relationship_types_returned=(
             "CALLS",
@@ -1815,7 +1815,7 @@ TOOL_CAPABILITY_REGISTRY: tuple[ToolCapabilitySpec, ...] = (
             AgentTaskCategory.EXPLANATION.value,
         ),
         required_inputs=("path",),
-        optional_inputs=("symbol",),
+        optional_inputs=("symbol", "ids"),
         expected_output_type="EvidenceCitationList",
         relationship_types_returned=(),
         evidence_guarantees="Indexed chunk snippets paired with SHA-256 content hashes and line coordinates.",

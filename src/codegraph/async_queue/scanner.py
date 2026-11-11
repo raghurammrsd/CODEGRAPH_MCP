@@ -16,6 +16,7 @@ from pathlib import Path
 from codegraph.async_queue.detectors import run_all_detectors
 from codegraph.async_queue.models import (
     AsyncConsumerRecord,
+    AsyncMessagingSystem,
     AsyncProducerRecord,
     AsyncQueueEntity,
     AsyncQueueEvidenceClass,
@@ -211,6 +212,12 @@ class AsyncQueueScanner:
                         )
 
             # Re-read all existing producers and consumers from DB to re-link queues
+            def _to_sys(v: str) -> AsyncMessagingSystem:
+                try:
+                    return AsyncMessagingSystem(v)
+                except ValueError:
+                    return AsyncMessagingSystem.GENERIC
+
             prod_rows = con.execute(
                 "SELECT queue_id, system, destination, caller_canonical_id, file_path, line, call_snippet, confidence "
                 "FROM async_producers"
@@ -218,7 +225,7 @@ class AsyncQueueScanner:
             producers = [
                 AsyncProducerRecord(
                     queue_id=str(r[0]),
-                    system=AsyncSystem(str(r[1])),
+                    system=_to_sys(str(r[1])),
                     destination=str(r[2]),
                     caller_canonical_id=str(r[3]),
                     file_path=str(r[4]),
@@ -236,7 +243,7 @@ class AsyncQueueScanner:
             consumers = [
                 AsyncConsumerRecord(
                     queue_id=str(r[0]),
-                    system=AsyncSystem(str(r[1])),
+                    system=_to_sys(str(r[1])),
                     destination=str(r[2]),
                     handler_canonical_id=str(r[3]),
                     file_path=str(r[4]),
@@ -250,16 +257,19 @@ class AsyncQueueScanner:
             con.execute("DELETE FROM async_links WHERE evidence_class='STATIC_QUEUE_LINKED'")
             con.execute("DELETE FROM async_queues")
         else:
-            producers: list[AsyncProducerRecord] = []
-            consumers: list[AsyncConsumerRecord] = []
+            full_producers: list[AsyncProducerRecord] = []
+            full_consumers: list[AsyncConsumerRecord] = []
 
             # Full scan of repository Python files
             for py_file in self.repository.rglob("*.py"):
                 if ".git" in py_file.parts or "__pycache__" in py_file.parts or ".codegraph" in py_file.parts:
                     continue
                 prods, cons = scan_file_for_async(py_file, self.repository)
-                producers.extend(prods)
-                consumers.extend(cons)
+                full_producers.extend(prods)
+                full_consumers.extend(cons)
+
+            producers = full_producers
+            consumers = full_consumers
 
             # Clear existing static async tables
             con.execute("DELETE FROM async_links WHERE evidence_class='STATIC_QUEUE_LINKED'")
