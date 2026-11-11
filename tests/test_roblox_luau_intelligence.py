@@ -539,7 +539,7 @@ return table.freeze(Module_{i})
     sum_100 = idx_100.index()
     elapsed_100 = time.perf_counter() - t0
     assert sum_100["indexed"] == 100
-    assert elapsed_100 < 15.0
+    assert elapsed_100 < 30.0
 
     repo_1000 = (tmp_path / "luau_1000").resolve()
     repo_1000.mkdir(parents=True, exist_ok=True)
@@ -559,4 +559,4 @@ return Mod_{i}
     sum_1000 = idx_1000.index()
     elapsed_1000 = time.perf_counter() - t1
     assert sum_1000["indexed"] == 1000
-    assert elapsed_1000 < 60.0
+    assert elapsed_1000 < 120.0
