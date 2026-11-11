@@ -388,3 +388,79 @@ def test_production_first_ranking_policy(tmp_path: Path) -> None:
             test_files = [t[1] for t in wire["statically_linked_tests"]]
             assert any("test_user.py" in tf for tf in test_files)
 
+
+def test_strict_wire_budget_and_file_ordering(tmp_path: Path) -> None:
+    """Strict wire token budget <= 1000 tokens and production files precede test files."""
+    repo = tmp_path / "strict_wire_repo"
+    repo.mkdir()
+    (repo / "core_service.py").write_text(
+        "def execute_task():\n    return 'done'\n",
+        encoding="utf-8",
+    )
+    tests_dir = repo / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_core.py").write_text(
+        "from core_service import execute_task\n"
+        "def test_execute():\n"
+        "    assert execute_task() == 'done'\n",
+        encoding="utf-8",
+    )
+
+    idx = Indexer(repo)
+    idx.index()
+
+    with idx.session() as con:
+        pkt = get_context(con, repo, "execute_task", max_tokens=1000)
+        wire = pkt.to_wire_dict(compact=True, explain=False, max_tokens=1000)
+
+        # Wire token cap strictly enforced
+        raw_json = json.dumps(wire, ensure_ascii=False, separators=(",", ":"))
+        try:
+            import tiktoken
+            enc = tiktoken.get_encoding("o200k_base")
+            tok_count = len(enc.encode(raw_json))
+        except Exception:
+            tok_count = (len(raw_json) + 3) // 4
+        assert tok_count <= 1000
+
+        # Wire structure keys
+        assert "target" in wire
+        assert isinstance(wire.get("uncertainties"), list)
+
+        # Production files precede test files in wire['files']
+        if "files" in wire and len(wire["files"]) > 1:
+            file_names = [f["file"] for f in wire["files"]]
+            prod_indices = [i for i, fn in enumerate(file_names) if "tests" not in fn and "test_" not in fn]
+            test_indices = [i for i, fn in enumerate(file_names) if "tests" in fn or "test_" in fn]
+            if prod_indices and test_indices:
+                assert max(prod_indices) < min(test_indices)
+
+
+def test_trace_call_scoped_callees_no_child_expansion(tmp_path: Path) -> None:
+    """trace_call on a factory function does not expand callees of its nested child functions."""
+    from codegraph.graph.traversal import trace_call
+
+    repo = tmp_path / "scoped_callee_repo"
+    repo.mkdir()
+    (repo / "factory.py").write_text(
+        "def outer_setup():\n    pass\n\n"
+        "def nested_callee():\n    pass\n\n"
+        "def build_factory():\n"
+        "    outer_setup()\n"
+        "    def nested_worker():\n"
+        "        nested_callee()\n"
+        "    return nested_worker\n",
+        encoding="utf-8",
+    )
+
+    idx = Indexer(repo)
+    idx.index()
+
+    with idx.session() as con:
+        res = trace_call(con, "build_factory", max_depth=1, callers=False, callees=True)
+        callee_edges = [x for x in res if x.get("relationship") in ("CALLS", "CALLEE")]
+        callee_names = [str(x.get("callee") or x.get("target_symbol") or x.get("symbol")) for x in callee_edges]
+        assert any("outer_setup" in c for c in callee_names)
+        assert not any("nested_callee" in c for c in callee_names)
+
+

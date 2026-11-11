@@ -268,6 +268,30 @@ class ContextPacket(BaseModel):
         if summary:
             wire["summary"] = summary
 
+        if self.target:
+            target_info: dict[str, object] = {}
+            if isinstance(self.target, dict):
+                raw = self.target.get("raw_targets")
+                if raw:
+                    target_info["targets"] = raw
+                resolutions = self.target.get("resolutions")
+                if isinstance(resolutions, dict) and resolutions:
+                    target_info["resolved"] = [
+                        {
+                            "name": v.get("qualified_name") or k,
+                            "file": v.get("file_path"),
+                            "confidence": v.get("confidence"),
+                        }
+                        for k, v in resolutions.items()
+                        if isinstance(v, dict)
+                    ]
+            elif isinstance(self.target, str):
+                target_info["target"] = self.target
+            if target_info:
+                wire["target"] = target_info
+
+        wire["uncertainties"] = list(self.uncertainties[:5]) if self.uncertainties else []
+
         if self.symbols:
             wire["symbols"] = [
                 {
@@ -279,12 +303,17 @@ class ContextPacket(BaseModel):
             ]
 
         if self.files:
+            def _is_test_file_ref(path_str: str) -> bool:
+                p = path_str.lower()
+                return "/tests/" in p or "/test/" in p or p.startswith("test_") or "/test_" in p or p.endswith("_test.py") or p.startswith("tests/")
+
+            sorted_files = sorted(self.files, key=lambda f: (1 if _is_test_file_ref(f.file) else 0, -f.score))
             wire["files"] = [
                 {
                     "file": f.file,
                     "score": f.score,
                 }
-                for f in self.files[:10]
+                for f in sorted_files[:10]
             ]
 
         if self.evidence:
@@ -323,16 +352,20 @@ class ContextPacket(BaseModel):
         if self.selection_rationale and self.selection_rationale.get("child_tools"):
             wire["child_tools"] = self.selection_rationale["child_tools"][:20]
 
-        if self.uncertainties:
-            wire["uncertainties"] = self.uncertainties[:5]
-
         def _calc_tokens(d: dict[str, object]) -> int:
             try:
                 import tiktoken
                 enc = tiktoken.get_encoding("o200k_base")
                 return len(enc.encode(json.dumps(d, ensure_ascii=False, separators=(',', ':'))))
             except Exception:
-                return len(json.dumps(d, ensure_ascii=False, separators=(',', ':'))) // 4
+                return (len(json.dumps(d, ensure_ascii=False, separators=(',', ':'))) + 3) // 4
+
+        # Progressive pruning loop to strictly enforce wire-level max_tokens
+        if _calc_tokens(wire) > max_tokens and "evidence" in wire:
+            for ev_item in wire["evidence"]:
+                snip = ev_item.get("snippet", "")
+                if len(snip) > 180:
+                    ev_item["snippet"] = snip[:180] + "..."
 
         while _calc_tokens(wire) > max_tokens and wire.get("evidence") and len(wire["evidence"]) > 1:
             wire["evidence"].pop()
@@ -340,13 +373,55 @@ class ContextPacket(BaseModel):
         if _calc_tokens(wire) > max_tokens and wire.get("evidence"):
             for ev_item in wire["evidence"]:
                 snip = ev_item.get("snippet", "")
-                if len(snip) > 250:
-                    ev_item["snippet"] = snip[:250] + " ... [trimmed]"
-                    if _calc_tokens(wire) <= max_tokens:
-                        break
+                if len(snip) > 80:
+                    ev_item["snippet"] = snip[:80] + "..."
+            if _calc_tokens(wire) > max_tokens:
+                wire.pop("evidence", None)
 
-        if _calc_tokens(wire) > max_tokens and wire.get("relationships") and len(wire["relationships"]) > 5:
-            wire["relationships"] = wire["relationships"][:5]
+        if _calc_tokens(wire) > max_tokens and "child_tools" in wire:
+            if len(wire["child_tools"]) > 5:
+                wire["child_tools"] = wire["child_tools"][:5]
+            if _calc_tokens(wire) > max_tokens:
+                wire.pop("child_tools", None)
+
+        if _calc_tokens(wire) > max_tokens and "relationships" in wire:
+            if len(wire["relationships"]) > 5:
+                wire["relationships"] = wire["relationships"][:5]
+            if _calc_tokens(wire) > max_tokens and len(wire["relationships"]) > 2:
+                wire["relationships"] = wire["relationships"][:2]
+            if _calc_tokens(wire) > max_tokens:
+                wire.pop("relationships", None)
+
+        if _calc_tokens(wire) > max_tokens:
+            if "routes" in wire and len(wire["routes"]) > 3:
+                wire["routes"] = wire["routes"][:3]
+            if "statically_linked_tests" in wire and len(wire["statically_linked_tests"]) > 3:
+                wire["statically_linked_tests"] = wire["statically_linked_tests"][:3]
+
+        if _calc_tokens(wire) > max_tokens:
+            wire.pop("routes", None)
+            wire.pop("statically_linked_tests", None)
+
+        if _calc_tokens(wire) > max_tokens and "symbols" in wire:
+            if len(wire["symbols"]) > 8:
+                wire["symbols"] = wire["symbols"][:8]
+            if _calc_tokens(wire) > max_tokens and len(wire["symbols"]) > 4:
+                wire["symbols"] = wire["symbols"][:4]
+            if _calc_tokens(wire) > max_tokens and len(wire["symbols"]) > 2:
+                wire["symbols"] = wire["symbols"][:2]
+
+        if _calc_tokens(wire) > max_tokens and "files" in wire:
+            if len(wire["files"]) > 5:
+                wire["files"] = wire["files"][:5]
+            if _calc_tokens(wire) > max_tokens and len(wire["files"]) > 2:
+                wire["files"] = wire["files"][:2]
+
+        if _calc_tokens(wire) > max_tokens and "summary" in wire:
+            s_val = str(wire["summary"])
+            if len(s_val) > 120:
+                wire["summary"] = s_val[:120] + "..."
+            if _calc_tokens(wire) > max_tokens:
+                wire.pop("summary", None)
 
         return wire
 
@@ -1349,6 +1424,19 @@ def _get_context_impl(
                 for c in callers:
                     caller_sym = c.get("symbol")
                     rel = str(c.get("relationship", "CALLS"))
+                    ev_cls = str(c.get("evidence_class", "")).upper()
+                    conf = str(c.get("confidence", "HIGH")).upper()
+                    if rel in ("UNRESOLVED_REFERENCE", "DYNAMIC_DISPATCH") or ev_cls in ("UNKNOWN", "LOW") or conf == "LOW":
+                        findings_out.append({
+                            "type": "EPISTEMIC_EDGE",
+                            "source": caller_sym or "unresolved",
+                            "relationship": rel,
+                            "target": short,
+                            "evidence_class": ev_cls or "UNKNOWN",
+                            "confidence": conf,
+                            "file": c.get("file", ""),
+                            "line": c.get("start_line", 1),
+                        })
                     if not _retrieval_policy.allows(rel):
                         continue
                     if not _guard.allows_symbol(str(caller_sym) if caller_sym else None):
@@ -1372,6 +1460,19 @@ def _get_context_impl(
                 for c in callees:
                     callee_sym = c.get("callee")
                     rel = str(c.get("relationship", "CALLS"))
+                    ev_cls = str(c.get("evidence_class", "")).upper()
+                    conf = str(c.get("confidence", "HIGH")).upper()
+                    if rel in ("UNRESOLVED_REFERENCE", "DYNAMIC_DISPATCH") or ev_cls in ("UNKNOWN", "LOW") or conf == "LOW":
+                        findings_out.append({
+                            "type": "EPISTEMIC_EDGE",
+                            "source": short,
+                            "relationship": rel,
+                            "target": callee_sym or "unresolved",
+                            "evidence_class": ev_cls or "UNKNOWN",
+                            "confidence": conf,
+                            "file": c.get("file", ""),
+                            "line": c.get("line", 1),
+                        })
                     if not _retrieval_policy.allows(rel):
                         continue
                     if not _guard.allows_symbol(str(callee_sym) if callee_sym else None):
@@ -2084,6 +2185,13 @@ def _get_context_impl(
                     token_estimate=it.estimated_tokens,
                 )
             )
+
+        # Sort files_out: production files first, then descending by relevance score
+        def _is_test_file(path_str: str) -> bool:
+            p = path_str.lower()
+            return "/tests/" in p or "/test/" in p or p.startswith("test_") or "/test_" in p or p.endswith("_test.py")
+
+        files_out.sort(key=lambda f: (1 if _is_test_file(f.file) else 0, -f.score))
 
         # 7. Package-aware bounded packages list & unresolved package dependency preservation
         packages_out: list[dict[str, object]] = []

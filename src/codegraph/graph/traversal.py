@@ -1637,15 +1637,20 @@ def trace_call(
     if do_callees:
         current_symbols = [symbol]
         for d in definitions:
-            if d["canonical_id"] not in current_symbols:
-                current_symbols.append(str(d["canonical_id"]))
-            child_methods = con.execute(
-                "SELECT canonical_id FROM symbols WHERE parent_symbol_id=?",
-                (d["canonical_id"],),
-            ).fetchall()
-            for cm in child_methods:
-                if str(cm["canonical_id"]) not in current_symbols:
-                    current_symbols.append(str(cm["canonical_id"]))
+            cid = str(d["canonical_id"])
+            if cid not in current_symbols:
+                current_symbols.append(cid)
+            # Only expand methods if the symbol is a class/interface/struct
+            s_row = con.execute("SELECT kind FROM symbols WHERE canonical_id=? LIMIT 1", (cid,)).fetchone()
+            s_kind = str(s_row["kind"]).lower() if s_row and s_row["kind"] else ""
+            if s_kind in ("class", "interface", "struct"):
+                child_methods = con.execute(
+                    "SELECT canonical_id FROM symbols WHERE parent_symbol_id=?",
+                    (cid,),
+                ).fetchall()
+                for cm in child_methods:
+                    if str(cm["canonical_id"]) not in current_symbols:
+                        current_symbols.append(str(cm["canonical_id"]))
         visited_callees: set[str] = set()
         for depth_step in range(effective_depth):
             next_symbols = []
