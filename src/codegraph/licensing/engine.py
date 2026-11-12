@@ -32,14 +32,21 @@ def get_machine_fingerprint() -> str:
     return hashlib.sha256(system_str.encode("utf-8")).hexdigest()[:16]
 
 
-def detect_usage_profile(repo_path: Path | None = None, database_url: str | None = None) -> UsageProfile:
+def detect_usage_profile(
+    repo_path: Path | None = None,
+    database_url: str | None = None,
+    is_ci: bool | None = None,
+) -> UsageProfile:
     """Determine whether current execution is single-developer local, team collaboration, or cloud DB."""
     db_url = database_url or os.getenv("CODEGRAPH_DATABASE_URL") or ""
     is_cloud_db = db_url.startswith("postgresql://") or db_url.startswith("postgres://")
     db_type = "postgresql" if is_cloud_db else "sqlite"
 
-    ci_env_vars = ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI", "TRAVIS", "JENKINS_URL", "BUILDKITE"]
-    is_ci = any(os.getenv(var) for var in ci_env_vars)
+    if is_ci is None:
+        ci_env_vars = ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI", "TRAVIS", "JENKINS_URL", "BUILDKITE"]
+        is_ci_detected = any(os.getenv(var) for var in ci_env_vars)
+    else:
+        is_ci_detected = is_ci
 
     contributors: set[str] = set()
     repo = repo_path or Path.cwd()
@@ -65,12 +72,12 @@ def detect_usage_profile(repo_path: Path | None = None, database_url: str | None
     if not contributors:
         contributors.add(f"{os.getenv('USER', 'developer')}@local")
 
-    is_team = (len(contributors) > 1) or is_ci
+    is_team = (len(contributors) > 1) or is_ci_detected
 
     return UsageProfile(
         is_cloud_db=is_cloud_db,
         database_type=db_type,
-        is_ci=is_ci,
+        is_ci=is_ci_detected,
         contributor_count_30d=len(contributors),
         contributors=sorted(list(contributors)),
         machine_fingerprint=get_machine_fingerprint(),
@@ -196,9 +203,10 @@ def check_license(
     database_url: str | None = None,
     license_key: str | None = None,
     storage_dir: Path | None = None,
+    is_ci: bool | None = None,
 ) -> LicenseStatus:
     """Core license gate evaluating usage profile against commercial tiers."""
-    profile = detect_usage_profile(repo_path, database_url)
+    profile = detect_usage_profile(repo_path, database_url, is_ci=is_ci)
 
     # 1. Single developer on local machine with SQLite is 100% Free Forever
     if not profile.is_cloud_db and not profile.is_team:

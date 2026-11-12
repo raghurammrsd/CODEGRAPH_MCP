@@ -4,6 +4,7 @@ import json
 import time
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from codegraph.cli import app
@@ -25,15 +26,24 @@ def test_machine_fingerprint_deterministic() -> None:
     assert len(fp1) == 16
 
 
-def test_single_developer_on_local_sqlite_free_forever(tmp_path: Path) -> None:
+def test_single_developer_on_local_sqlite_free_forever(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A developer working on their laptop with local SQLite is 100% free."""
-    status = check_license(repo_path=tmp_path, database_url=None, storage_dir=tmp_path / ".cg")
+    for var in ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI", "TRAVIS", "JENKINS_URL", "BUILDKITE"]:
+        monkeypatch.delenv(var, raising=False)
+    status = check_license(repo_path=tmp_path, database_url=None, storage_dir=tmp_path / ".cg", is_ci=False)
     assert status.tier == LicenseTier.COMMUNITY_FREE
     assert status.is_valid is True
     assert status.is_free_single_developer is True
     assert status.is_cloud_db is False
     assert status.active_seats == 1
     assert "Free Forever" in status.message
+
+
+def test_ci_environment_detected_as_team(tmp_path: Path) -> None:
+    """In CI environments, CodeGraph detects team usage and activates trial/team tier."""
+    status = check_license(repo_path=tmp_path, database_url=None, storage_dir=tmp_path / ".cg_ci", is_ci=True)
+    assert status.tier in {LicenseTier.TEAM_TRIAL, LicenseTier.TEAM_PRO}
+    assert status.is_free_single_developer is False
 
 
 def test_cloud_db_initiates_14_day_free_trial(tmp_path: Path) -> None:
@@ -106,8 +116,10 @@ def test_cryptographic_license_minting_and_anti_tamper(tmp_path: Path) -> None:
     assert verify_license_key(expired_token_str) is None
 
 
-def test_cli_auth_status_and_trial_commands(tmp_path: Path) -> None:
+def test_cli_auth_status_and_trial_commands(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test CLI commands: `codegraph auth status` and `codegraph auth trial`."""
+    for var in ["CI", "GITHUB_ACTIONS", "GITLAB_CI", "CIRCLECI", "TRAVIS", "JENKINS_URL", "BUILDKITE"]:
+        monkeypatch.delenv(var, raising=False)
     runner = CliRunner()
 
     # 1. Auth status
