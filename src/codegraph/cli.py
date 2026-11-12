@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import sys
+import time
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -3505,6 +3506,134 @@ def db_push_cmd(
         else:
             cli_echo(f"Failed to push index: {result.get('error')}", err=True)
             raise typer.Exit(code=1)
+
+
+auth_app = typer.Typer(help="Commercial license, team trial, and seat management.")
+
+
+@auth_app.command("status")
+def auth_status_cmd(
+    path: Annotated[Path | None, typer.Argument(help="Repository path (default: current directory)")] = None,
+    repository: Annotated[Path | None, typer.Option("--repository", "-r", "--repo", help="Repository path")] = None,
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Display current license tier, 14-day team trial status, and active seats."""
+    from codegraph.licensing import check_license
+
+    repo = _resolve_repo(path, repository)
+    lic = check_license(repo)
+    if json_output:
+        cli_echo(json.dumps(lic.model_dump(), indent=2), json_mode=True)
+    else:
+        cli_echo("CodeGraph Engine Licensing & Team Status:")
+        cli_echo(f"  Tier:             {lic.tier.value}")
+        cli_echo(f"  Status:           {'Valid / Active' if lic.is_valid else 'Upgrade Required'}")
+        cli_echo(f"  Single Developer: {'Yes (100% Free Forever)' if lic.is_free_single_developer else 'No (Team / Cloud DB Mode)'}")
+        cli_echo(f"  Database Mode:    {'Cloud PostgreSQL' if lic.is_cloud_db else 'Local SQLite'}")
+        cli_echo(f"  Active Seats:     {lic.active_seats} / {lic.max_seats}")
+        if lic.days_remaining is not None:
+            cli_echo(f"  Days Remaining:   {lic.days_remaining} days")
+        cli_echo(f"  Message:          {lic.message}")
+        if not lic.is_valid or not lic.is_free_single_developer:
+            cli_echo(f"  Manage / Upgrade: {lic.checkout_url}")
+
+
+@auth_app.command("activate")
+def auth_activate_cmd(
+    key: Annotated[str, typer.Option("--key", "-k", help="Cryptographically signed license key string", prompt=True)],
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Activate a commercial team or enterprise license key."""
+    from codegraph.licensing import save_license_key, verify_license_key
+
+    token = verify_license_key(key)
+    if not token:
+        cli_echo("Error: Invalid, tampered, or expired license key.", err=True)
+        cli_echo("  Purchase or renew team seats at: https://codegraph.dev/pricing", err=True)
+        raise typer.Exit(code=1)
+
+    save_license_key(key)
+    res = {
+        "status": "ok",
+        "team_name": token.team_name,
+        "tier": token.tier.value,
+        "seats_licensed": token.seats_licensed,
+        "expires_at": token.expires_at,
+        "message": f"Successfully activated license for '{token.team_name}' ({token.seats_licensed} seats).",
+    }
+    if json_output:
+        cli_echo(json.dumps(res, indent=2), json_mode=True)
+    else:
+        cli_echo(f"Successfully activated license for '{token.team_name}'!")
+        cli_echo(f"  Tier:           {token.tier.value}")
+        cli_echo(f"  Licensed Seats: {token.seats_licensed}")
+        cli_echo("  Features:       Team Collaboration, Cloud DB, PR Gates, Token Optimizer")
+
+
+@auth_app.command("trial")
+def auth_trial_cmd(
+    team_name: Annotated[str, typer.Option("--team", help="Team or Organization name")] = "Team",
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Start or inspect the 14-day free trial for teams (up to 10 users)."""
+    from codegraph.licensing import TrialManager
+
+    tm = TrialManager()
+    state = tm.get_or_start_trial(team_name=team_name)
+    now = time.time()
+    expires_at = state.get("expires_at", now)
+    days_left = max(0, int((expires_at - now) / 86400))
+    active_seats = len(state.get("active_seats", []))
+
+    res = {
+        "team_name": state.get("team_name", team_name),
+        "days_remaining": days_left,
+        "active_seats": active_seats,
+        "max_seats": 10,
+        "status": "active" if days_left > 0 else "expired",
+    }
+    if json_output:
+        cli_echo(json.dumps(res, indent=2), json_mode=True)
+    else:
+        cli_echo(f"14-Day Free Team Trial ({state.get('team_name', team_name)}):")
+        cli_echo(f"  Status:         {'Active' if days_left > 0 else 'Expired'}")
+        cli_echo(f"  Days Remaining: {days_left} days")
+        cli_echo(f"  Active Seats:   {active_seats} / 10 seats")
+        cli_echo("  Upgrade:        https://codegraph.dev/pricing")
+
+
+@auth_app.command("buy")
+def auth_buy_cmd() -> None:
+    """Display Team Pro checkout link to purchase seats or subscribe."""
+    cli_echo("CodeGraph Team Pro Subscription ($29/seat/month):")
+    cli_echo("  • Up to 100+ seats, Cloud PostgreSQL support, and shared team graphs")
+    cli_echo("  • Purchase or manage seats: https://codegraph.dev/pricing")
+
+
+app.add_typer(auth_app, name="auth")
+
+
+@app.command("metrics")
+def metrics_cmd(
+    downloads: Annotated[bool, typer.Option("--downloads", help="Display official PyPI download statistics")] = True,
+    package: Annotated[str, typer.Option("--package", help="Package name")] = "codegraph-engine",
+    json_output: Annotated[bool, typer.Option("--json", help="Output JSON format")] = False,
+) -> None:
+    """Display download metrics and ecosystem telemetry for CodeGraph."""
+    from codegraph.licensing.telemetry import fetch_pypi_download_stats
+
+    stats = fetch_pypi_download_stats(package)
+    if json_output:
+        cli_echo(json.dumps(stats, indent=2), json_mode=True)
+    else:
+        cli_echo(f"Official PyPI Download Metrics for '{package}':")
+        cli_echo(f"  Last 24 Hours:  {stats.get('last_day', 0):,} downloads")
+        cli_echo(f"  Last 7 Days:    {stats.get('last_week', 0):,} downloads")
+        cli_echo(f"  Last 30 Days:   {stats.get('last_month', 0):,} downloads")
+        cli_echo("  Dashboards:")
+        cli_echo(f"    • https://pypistats.org/packages/{package}")
+        cli_echo(f"    • https://pepy.tech/projects/{package}")
+
 
 
 if __name__ == "__main__":

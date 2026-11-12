@@ -30,13 +30,13 @@ echo "-> Detected Platform: ${OS} (${ARCH})"
 # Install using uv / python pip if available, or direct binary download
 if command -v uv >/dev/null 2>&1; then
     echo "-> Installing via uv tool..."
-    uv tool install --force "codegraph-engine>=3.0.2"
+    uv tool install --force "codegraph-engine>=3.0.3"
 elif command -v pip3 >/dev/null 2>&1; then
     echo "-> Installing via pip3..."
-    pip3 install --upgrade "codegraph-engine>=3.0.2"
+    pip3 install --upgrade "codegraph-engine>=3.0.3"
 elif command -v python3 >/dev/null 2>&1; then
     echo "-> Installing via python3 -m pip..."
-    python3 -m pip install --upgrade "codegraph-engine>=3.0.2"
+    python3 -m pip install --upgrade "codegraph-engine>=3.0.3"
 else
     echo "-> Downloading standalone zero-dependency binary..."
     RELEASE_URL="https://github.com/${REPO}/releases/latest/download/codegraph-${OS}-${ARCH}"

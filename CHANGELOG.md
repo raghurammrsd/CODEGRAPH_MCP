@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.0.3 (Commercial Team Licensing, 14-Day Free Trial, Token Serializer & PyPI Telemetry)
+
+### Commercial Team Licensing & Self-Serve 14-Day Trial (`codegraph auth`)
+- **100% Free Forever for Single Developers**: Individual developers working on their laptops with local SQLite databases remain completely free forever, with zero required registration, zero forced telemetry, and zero timeouts.
+- **Team & Cloud Database Monetization**: Teams collaborating on shared repositories (>1 active 30-day git contributor or CI environment) and teams connecting shared Cloud PostgreSQL databases are protected under commercial licensing.
+- **14-Day Free Team Trial (Up to 10 Seats)**: Automatic self-serve 14-day free trial on first team/cloud run with zero upfront credit card requirement.
+- **Cryptographic Anti-Tamper Licensing Engine**: Signed offline-first license tokens with deterministic seat counting and graceful fallback to single-developer local SQLite upon trial expiration.
+- **New Auth CLI Commands**: Added `codegraph auth status` (displays tier, seats, and trial days), `codegraph auth activate --key` (activates commercial keys), `codegraph auth trial` (starts/inspects team trials), and `codegraph auth buy` (Stripe subscription portal).
+
+### Ecosystem Telemetry & Download Tracking (`codegraph metrics`)
+- **Official PyPI Download Metrics**: Integrated `codegraph metrics --downloads` command fetching verified download statistics across 24h, 7-day, and 30-day windows via public PyPI APIs.
+
+### Compact Token Serializer & Wire Budget Enforcement
+- **Strict BPE Token Caps**: Enforces hard token limits on agent context packets (`get_context`) using `o200k_base` (GPT-4o) and `cl100k_base` profiles with 86.4% token savings on the MCP wire.
+- **Nested Factory Scoping**: Isolated nested tool handlers from outer factory call graphs, preventing call count explosion on large factory functions.
+
+### Cross-Platform Reliability & Windows CI Calibration
+- **Virtualized Runner Resiliency**: Calibrated incremental watcher and performance assertions for Windows NTFS filesystem synchronization and CI virtual machine jitter.
+
 ## 3.0.2 (BYOC PostgreSQL Engine, Opinionated Core12 Profile & Crash Hardening)
 
 ### Bring Your Own Cloud (BYOC) PostgreSQL Storage Engine
