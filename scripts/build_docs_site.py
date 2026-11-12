@@ -139,13 +139,13 @@ def generate_docs():
       "priceCurrency": "USD"
     },
     "description": "Production Model Context Protocol (MCP) server providing Web UI visualizer, VS Code extension, Git-aware repository intelligence, runtime telemetry reconciliation, database lineage, and 97 graph analysis tools for AI coding agents.",
-    "softwareVersion": "3.0.1",
+    "softwareVersion": "3.0.3",
     "author": {
       "@type": "Person",
       "name": "Raghuram",
       "url": "https://github.com/raghurammrsd"
     },
-    "downloadUrl": "https://pypi.org/project/codegraph-engine/3.0.1/",
+    "downloadUrl": "https://pypi.org/project/codegraph-engine/3.0.3/",
     "codeRepository": "https://github.com/raghurammrsd/CODEGRAPH_MCP"
   }
   </script>
@@ -805,7 +805,7 @@ def generate_docs():
           <circle cx="16" cy="16" r="3" fill="#2563eb"/>
         </svg>
         <span class="brand-name">CodeGraph MCP</span>
-        <span class="badge-ver">v3.0.1</span>
+        <span class="badge-ver">v3.0.3</span>
       </a>
 
       <!-- Universal Search (Cmd K) -->
@@ -839,7 +839,7 @@ def generate_docs():
     <div>
       <div class="hero-badge-tag">
         <span class="dot-online"></span>
-        <span>v3.0.1 Production · 25 Pillars, 97 Verified FastMCP Tools, Multi-Language CSR Engine</span>
+        <span>v3.0.3 Production · Single Dev Free Forever · 14-Day Team Trial · 97 Verified FastMCP Tools</span>
       </div>
 
       <h1 class="hero-headline-h1">
@@ -858,6 +858,7 @@ def generate_docs():
           <button class="term-tab-item" onclick="setHeroTermCmd('codegraph ui', this)">Web Dashboard</button>
           <button class="term-tab-item" onclick="setHeroTermCmd('codegraph watch .', this)">Live Watcher</button>
           <button class="term-tab-item" onclick="setHeroTermCmd('codegraph impact --symbol main', this)">PR Blast Radius</button>
+          <button class="term-tab-item" onclick="setHeroTermCmd('codegraph auth status', this)">Licensing</button>
           <button class="term-tab-item" onclick="setHeroTermCmd('from codegraph import get_context', this)">Python API</button>
         </div>
         <div class="term-code-line">
@@ -1062,6 +1063,27 @@ def generate_docs():
 
   </section>
 
+  <!-- Real Terminal Demo & Marketing Showcase -->
+  <section style="max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem;">
+    <div style="background: #0f172a; border-radius: 12px; padding: 1.5rem; border: 1px solid #1e293b; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: #ef4444;"></span>
+          <span style="display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: #eab308;"></span>
+          <span style="display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: #22c55e;"></span>
+          <span style="color: #cbd5e1; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; margin-left: 0.5rem; font-weight: 600;">Real Terminal Demo: Sub-15ms Indexing, PR Blast Radius, &amp; Team Licensing</span>
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+          <a href="assets/codegraph_agent_marketing_1080p.mp4" target="_blank" style="color: #38bdf8; font-size: 0.8rem; font-weight: 600; text-decoration: none; border: 1px solid #0284c7; padding: 0.3rem 0.75rem; border-radius: 6px; background: rgba(56, 189, 248, 0.1);">Full HD 1080p Video (MP4)</a>
+          <a href="assets/codegraph_terminal_demo.gif" target="_blank" style="color: #94a3b8; font-size: 0.8rem; font-weight: 600; text-decoration: none; border: 1px solid #475569; padding: 0.3rem 0.75rem; border-radius: 6px; background: rgba(255, 255, 255, 0.05);">Compact GIF</a>
+        </div>
+      </div>
+      <div style="text-align: center;">
+        <img src="assets/codegraph_agent_marketing_preview.gif" alt="CodeGraph Real Terminal AI Agent Execution" style="width: 100%; max-width: 1050px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);" />
+      </div>
+    </div>
+  </section>
+
   <!-- 3-Column Book Layout (Exact layout from user screenshot) -->
   <div class="book-layout-wrap" id="docs-book">
 
@@ -1250,10 +1272,10 @@ codegraph status .</pre>
           <li><strong>MCP Tool Serving:</strong> FastMCP stdio/SSE server serves 82 verified tools with token-bounded context packets.</li>
         </ul>
 
-        <!-- Section: Git-Aware Intelligence (v3.0.1) -->
-        <h2 class="editorial-h2" id="git-intelligence-guide">Git-Aware Repository Intelligence &amp; Merge Conflict Safety (v3.0.1)</h2>
+        <!-- Section: Git-Aware Intelligence (v3.0.3) -->
+        <h2 class="editorial-h2" id="git-intelligence-guide">Git-Aware Repository Intelligence &amp; Merge Conflict Safety (v3.0.3)</h2>
         <p class="editorial-p">
-          CodeGraph MCP v3.0.1 understands how the repository changed across branches and commits, what those changes affect, and whether previously generated context is still valid.
+          CodeGraph MCP v3.0.3 understands how the repository changed across branches and commits, what those changes affect, and whether previously generated context is still valid.
         </p>
         <div class="callout-box git" style="background:#f0fdf4; border-left: 3px solid #10b981; padding: 0.75rem 1rem; border-radius: 6px; margin: 1rem 0;">
           <strong style="color:#047857;">Pre-Merge Safety:</strong> Standard git merge only checks for textual overlaps. CodeGraph checks for <strong>semantic contract conflicts</strong>&mdash;flagging when branch A invokes functions or route handlers that branch B deleted or modified.
@@ -1576,10 +1598,10 @@ codegraph status .</pre>
         <!-- Book Page Footer -->
         <footer class="book-page-footer">
           <div>
-            &copy; 2026 CodeGraph MCP &bull; MIT License &bull; v3.0.1 Production
+            &copy; 2026 CodeGraph MCP &bull; Source-Available / Commercial &bull; v3.0.3 Production
           </div>
           <div style="display:flex; gap:1.25rem;">
-            <a href="https://pypi.org/project/codegraph-engine/3.0.1/" target="_blank">PyPI Package</a>
+            <a href="https://pypi.org/project/codegraph-engine/3.0.3/" target="_blank">PyPI Package (v3.0.3)</a>
             <a href="https://github.com/raghurammrsd/CODEGRAPH_MCP" target="_blank">GitHub Repository</a>
             <a href="https://github.com/raghurammrsd/CODEGRAPH_MCP/issues" target="_blank">Issue Tracker</a>
           </div>

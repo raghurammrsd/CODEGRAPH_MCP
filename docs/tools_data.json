@@ -1272,13 +1272,16 @@
       "task",
       "intent",
       "max_tokens",
+      "budget_tokens",
       "max_files",
       "max_lines",
       "top_k",
       "plan",
       "mode",
       "explain",
-      "resource_mode"
+      "resource_mode",
+      "compact",
+      "tokenizer_profile"
     ],
     "parameters_schema": {
       "properties": {
@@ -1316,6 +1319,18 @@
           "default": 4000,
           "title": "Max Tokens",
           "type": "integer"
+        },
+        "budget_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Budget Tokens"
         },
         "max_files": {
           "default": 25,
@@ -1366,6 +1381,16 @@
           ],
           "default": null,
           "title": "Resource Mode"
+        },
+        "compact": {
+          "default": true,
+          "title": "Compact",
+          "type": "boolean"
+        },
+        "tokenizer_profile": {
+          "default": "o200k_base",
+          "title": "Tokenizer Profile",
+          "type": "string"
         }
       },
       "title": "get_contextArguments",
@@ -3078,11 +3103,13 @@
       "path"
     ],
     "optional_inputs": [
-      "symbol"
+      "symbol",
+      "ids"
     ],
     "parameters_schema": {
       "properties": {
         "path": {
+          "default": "",
           "title": "Path",
           "type": "string"
         },
@@ -3097,11 +3124,23 @@
           ],
           "default": null,
           "title": "Symbol"
+        },
+        "ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ids"
         }
       },
-      "required": [
-        "path"
-      ],
       "title": "get_evidenceArguments",
       "type": "object"
     },
@@ -5106,13 +5145,11 @@
     "parameters_schema": {
       "properties": {
         "transaction_id": {
+          "default": "",
           "title": "Transaction Id",
           "type": "string"
         }
       },
-      "required": [
-        "transaction_id"
-      ],
       "title": "rollback_refactorArguments",
       "type": "object"
     },
@@ -5364,13 +5401,11 @@
     "parameters_schema": {
       "properties": {
         "trace_id": {
+          "default": "",
           "title": "Trace Id",
           "type": "string"
         }
       },
-      "required": [
-        "trace_id"
-      ],
       "title": "get_distributed_traceArguments",
       "type": "object"
     },
@@ -5517,16 +5552,21 @@
     "parameters_schema": {
       "properties": {
         "symbols": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Symbols",
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Symbols"
         }
       },
-      "required": [
-        "symbols"
-      ],
       "title": "batch_get_symbolsArguments",
       "type": "object"
     },
@@ -5573,11 +5613,19 @@
     "parameters_schema": {
       "properties": {
         "symbols": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Symbols",
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Symbols"
         },
         "max_results_per_symbol": {
           "default": 10,
@@ -5585,9 +5633,6 @@
           "type": "integer"
         }
       },
-      "required": [
-        "symbols"
-      ],
       "title": "batch_find_callersArguments",
       "type": "object"
     },
@@ -5647,8 +5692,12 @@
                 "type": "string"
               },
               "type": "array"
+            },
+            {
+              "type": "null"
             }
           ],
+          "default": null,
           "title": "Tasks"
         },
         "max_tokens_per_task": {
@@ -5657,9 +5706,6 @@
           "type": "integer"
         }
       },
-      "required": [
-        "tasks"
-      ],
       "title": "batch_get_contextArguments",
       "type": "object"
     },
@@ -5700,17 +5746,22 @@
     "parameters_schema": {
       "properties": {
         "patches": {
-          "items": {
-            "additionalProperties": true,
-            "type": "object"
-          },
-          "title": "Patches",
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Patches"
         }
       },
-      "required": [
-        "patches"
-      ],
       "title": "preview_semantic_patchArguments",
       "type": "object"
     },
@@ -5761,12 +5812,20 @@
     "parameters_schema": {
       "properties": {
         "patches": {
-          "items": {
-            "additionalProperties": true,
-            "type": "object"
-          },
-          "title": "Patches",
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Patches"
         },
         "dry_run": {
           "default": false,
@@ -5774,9 +5833,6 @@
           "type": "boolean"
         }
       },
-      "required": [
-        "patches"
-      ],
       "title": "apply_semantic_patchArguments",
       "type": "object"
     },
@@ -6857,16 +6913,28 @@
     "parameters_schema": {
       "properties": {
         "patches": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "title": "Patches",
-          "type": "object"
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Patches"
         }
       },
-      "required": [
-        "patches"
-      ],
       "title": "evaluate_speculative_patchArguments",
       "type": "object"
     },
@@ -7096,18 +7164,16 @@
     "parameters_schema": {
       "properties": {
         "start_node": {
+          "default": "",
           "title": "Start Node",
           "type": "string"
         },
         "end_node": {
+          "default": "",
           "title": "End Node",
           "type": "string"
         }
       },
-      "required": [
-        "start_node",
-        "end_node"
-      ],
       "title": "fast_graph_pathArguments",
       "type": "object"
     },
@@ -7157,18 +7223,16 @@
     "parameters_schema": {
       "properties": {
         "interface_symbol": {
+          "default": "",
           "title": "Interface Symbol",
           "type": "string"
         },
         "method_name": {
+          "default": "",
           "title": "Method Name",
           "type": "string"
         }
       },
-      "required": [
-        "interface_symbol",
-        "method_name"
-      ],
       "title": "resolve_polymorphic_calleesArguments",
       "type": "object"
     },
