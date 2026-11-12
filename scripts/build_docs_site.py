@@ -1065,21 +1065,14 @@ def generate_docs():
 
   <!-- Real Terminal Demo & Marketing Showcase -->
   <section style="max-width: 1200px; margin: 2rem auto; padding: 0 1.5rem;">
-    <div style="background: #0f172a; border-radius: 12px; padding: 1.5rem; border: 1px solid #1e293b; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; border-bottom: 1px solid #334155; padding-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-          <span style="display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: #ef4444;"></span>
-          <span style="display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: #eab308;"></span>
-          <span style="display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: #22c55e;"></span>
-          <span style="color: #cbd5e1; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; margin-left: 0.5rem; font-weight: 600;">Real Terminal Demo: Sub-15ms Indexing, PR Blast Radius, &amp; Team Licensing</span>
-        </div>
-        <div style="display: flex; gap: 0.75rem;">
-          <a href="assets/codegraph_agent_marketing_1080p.mp4" target="_blank" style="color: #38bdf8; font-size: 0.8rem; font-weight: 600; text-decoration: none; border: 1px solid #0284c7; padding: 0.3rem 0.75rem; border-radius: 6px; background: rgba(56, 189, 248, 0.1);">Full HD 1080p Video (MP4)</a>
-          <a href="assets/codegraph_terminal_demo.gif" target="_blank" style="color: #94a3b8; font-size: 0.8rem; font-weight: 600; text-decoration: none; border: 1px solid #475569; padding: 0.3rem 0.75rem; border-radius: 6px; background: rgba(255, 255, 255, 0.05);">Compact GIF</a>
-        </div>
+    <div style="background: #0f172a; border-radius: 12px; padding: 1rem; border: 1px solid #1e293b; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);">
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding-left: 0.25rem;">
+        <span style="display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: #ef4444;"></span>
+        <span style="display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: #eab308;"></span>
+        <span style="display: inline-block; width: 11px; height: 11px; border-radius: 50%; background: #22c55e;"></span>
       </div>
       <div style="text-align: center;">
-        <img src="assets/codegraph_agent_marketing_preview.gif" alt="CodeGraph Real Terminal AI Agent Execution" style="width: 100%; max-width: 1050px; border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);" />
+        <img src="assets/codegraph_agent_marketing_preview.gif" alt="CodeGraph Real Terminal AI Agent Execution" style="width: 100%; max-width: 1050px; border-radius: 6px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5); display: block; margin: 0 auto;" />
       </div>
     </div>
   </section>

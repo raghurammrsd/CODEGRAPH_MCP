@@ -30,16 +30,8 @@
 
 ---
 
-## Real Terminal Demo
-
 <p align="center">
   <img src="docs/assets/codegraph_agent_marketing_preview.gif" alt="CodeGraph Real Terminal Demo with AI Agents" width="900" />
-</p>
-
-<p align="center">
-  <em>High-definition demo: Single-command indexing, microsecond CSR graph traversal, real-time PR blast radius, and 14-day team trial management.</em><br>
-  <a href="docs/assets/codegraph_agent_marketing_1080p.mp4"><strong>Watch Full 1080p Video (MP4)</strong></a> &bull;
-  <a href="docs/assets/codegraph_terminal_demo.gif"><strong>Compact GIF Version</strong></a>
 </p>
 
 ---
